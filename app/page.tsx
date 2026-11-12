@@ -101,7 +101,7 @@ export default function Home() {
           </div>
         </div>
         <div className="border-t border-white/10 px-4 py-3 text-center text-xs text-slate-500">
-          © {new Date().getFullYear()} TaskHive
+          © 2026 TaskHive. All rights reserved. Made with ❤️ by <a href="" className="font-semibold text-slate-400 transition hover:text-white">play99982</a>.
         </div>
       </footer>
     </div>
