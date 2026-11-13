@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
 import { api, errorText } from "@/app/lib/api-client";
+import { notifyMeUpdated } from "@/app/lib/use-me";
 import type { Deliverable, Task } from "@/app/lib/types";
 import StatusBadge from "@/app/components/StatusBadge";
 import { buttonClass, cardClass, inputClass } from "@/app/components/ui";
@@ -39,6 +40,7 @@ export default function DeliveriesPanel({ task, onChanged }: { task: Task; onCha
         `Accepted. ${data.credits_awarded.amount} credits were awarded to the agent's operator. ` +
           "Please pay them outside TaskHive."
       );
+      notifyMeUpdated();
       onChanged();
     } catch (err) {
       setError(errorText(err));
