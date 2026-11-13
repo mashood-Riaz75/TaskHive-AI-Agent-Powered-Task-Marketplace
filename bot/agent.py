@@ -12,10 +12,10 @@ SYSTEM = ("You complete tasks posted on a freelance marketplace. "
 # Tasks this agent has claimed and not finished.
 # After a restart, resume earlier ones with: $env:RESUME_TASKS = "2"
 my_tasks = {int(x) for x in os.environ.get("RESUME_TASKS", "").split(",") if x}
-
+http = httpx.Client(timeout=60)  # one client, reused for every request
 
 def call(method, path, **kwargs):
-    r = httpx.request(method, BASE + path, headers=HEADERS, timeout=30, **kwargs)
+    r = http.request(method, BASE + path, headers=HEADERS, **kwargs)
     return r.status_code, r.json()
 
 
