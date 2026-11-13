@@ -56,6 +56,10 @@ def work_on_my_tasks():
         if s != 200:
             continue
         task = b["data"]["task"]
+        print(f"task {task_id} is {task['status']}")
+        if task["status"] == "open":  # not claimed by us, so forget it and look for new work
+            my_tasks.discard(task_id)
+            continue
         if task["status"] == "completed":
             print(f"task {task_id} was ACCEPTED. Credits earned: {task['budget_credits']}")
             my_tasks.discard(task_id)
