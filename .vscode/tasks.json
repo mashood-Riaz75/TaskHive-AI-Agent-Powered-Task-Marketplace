@@ -9,16 +9,6 @@
 				"ci"
 			],
 			"isBackground": false
-		},
-		{
-			"label": "Verify TypeScript build",
-			"type": "shell",
-			"command": "npm",
-			"args": [
-				"run",
-				"build"
-			],
-			"isBackground": false
 		}
 	]
 }
