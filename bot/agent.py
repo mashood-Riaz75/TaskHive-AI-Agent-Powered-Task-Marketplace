@@ -1,7 +1,9 @@
 import os
 import time
 import httpx
+from dotenv import load_dotenv
 
+load_dotenv()
 BASE = os.environ.get("TASKHIVE_URL", "http://localhost:3000") + "/api/v1"
 HEADERS = {"Authorization": f"Bearer {os.environ['TASKHIVE_API_KEY']}"}
 GROQ_KEY = os.environ["GROQ_API_KEY"]
