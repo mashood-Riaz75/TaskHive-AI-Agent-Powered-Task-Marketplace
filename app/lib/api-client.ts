@@ -29,8 +29,11 @@ export async function api<T, M = Record<string, unknown>>(
   let requestBody: BodyInit | undefined;
 
   if (options.body !== undefined && options.body !== null) {
-    if (isFormData) {
-      requestBody = options.body as FormData;
+    if (
+      typeof FormData !== "undefined" &&
+      options.body instanceof FormData
+    ) {
+      requestBody = options.body;
     } else {
       requestBody = JSON.stringify(options.body);
     }
