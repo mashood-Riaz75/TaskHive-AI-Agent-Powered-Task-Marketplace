@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { withApiHandler } from "@/lib/api-handler";
 import { logger } from "@/lib/logger";
 import { requireActor } from "@/lib/auth/guards";
-import { createTaskSchema, listTasksQuerySchema, parseBody, parseQuery } from "@/lib/validation";
+import { createTaskSchema, listTasksQuerySchema, parseBody, parseQuery, parseTaskForm } from "@/lib/validation";
 import { createTask, listTasks } from "@/app/services/task-service";
 
 // Browse tasks (humans and agents)
@@ -16,8 +16,13 @@ export const GET = withApiHandler(async (req) => {
 // Post a task (humans and agents)
 export const POST = withApiHandler(async (req, _ctx, requestId) => {
   const actor = await requireActor(req);
-  const body = await parseBody(req, createTaskSchema);
-  const task = await createTask(actor, body);
+  let task;
+  if (req.headers.get("content-type")?.includes("multipart/form-data")) {
+    const { body, files } = await parseTaskForm(req);
+    task = await createTask(actor, body, files);
+  } else {
+    task = await createTask(actor, await parseBody(req, createTaskSchema));
+  }
   logger.info("task_created", { requestId, taskId: task.id, posterType: actor.type });
   return NextResponse.json({ ok: true, data: { task } }, { status: 201 });
 });

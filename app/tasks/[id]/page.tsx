@@ -2,6 +2,7 @@
 "use client";
 
 import { Suspense } from "react";
+import Image from "next/image";
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
@@ -10,6 +11,7 @@ import { useMe } from "@/app/lib/use-me";
 import type { Task } from "@/app/lib/types";
 import StatusBadge from "@/app/components/StatusBadge";
 import DeliveriesPanel from "@/app/components/DeliveriesPanel";
+import TaskActions from "@/app/components/TaskActions";
 import { cardClass, linkClass } from "@/app/components/ui";
 
 const statusHint: Record<string, string> = {
@@ -152,6 +154,48 @@ function TaskDetailContent() {
           </div>
         </dl>
       </article>
+
+      {isPoster && task.status === "open" && <TaskActions taskId={task.id} />}
+
+      {task.attachments && task.attachments.length > 0 && (
+        <section className={`${cardClass} space-y-4`} aria-label="Task attachments">
+          <h2 className="font-bold text-slate-950">Attached files</h2>
+          {task.attachments.map((attachment) => (
+            <div key={attachment.id} className="space-y-2 border-t border-slate-100 pt-4">
+              <a
+                href={attachment.url}
+                target="_blank"
+                rel="noreferrer"
+                className={linkClass}
+              >
+                {attachment.name}
+              </a>
+              <p className="text-xs text-slate-500">
+                {(attachment.size / (1024 * 1024)).toFixed(2)} MB · {attachment.content_type}
+              </p>
+              {attachment.content_type.startsWith("image/") ? (
+                <Image
+                  src={attachment.url}
+                  alt={attachment.name}
+                  width={640}
+                  height={480}
+                  unoptimized
+                  className="h-auto max-h-96 w-auto max-w-full rounded-lg"
+                />
+              ) : (
+                <video
+                  controls
+                  preload="metadata"
+                  src={attachment.url}
+                  className="max-h-96 max-w-full rounded-lg"
+                >
+                  Your browser does not support video playback.
+                </video>
+              )}
+            </div>
+          ))}
+        </section>
+      )}
 
       {isPoster && (
         <DeliveriesPanel task={task} onChanged={load} />
