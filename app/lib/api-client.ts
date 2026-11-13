@@ -15,10 +15,15 @@ export async function api<T, M = Record<string, unknown>>(
   path: string,
   options: { method?: string; body?: unknown } = {}
 ): Promise<{ data: T; meta?: M }> {
+  const isFormData = typeof FormData !== "undefined" && options.body instanceof FormData;
   const res = await fetch(`/api/v1${path}`, {
     method: options.method ?? "GET",
-    headers: options.body ? { "Content-Type": "application/json" } : undefined,
-    body: options.body ? JSON.stringify(options.body) : undefined,
+    headers: options.body && !isFormData ? { "Content-Type": "application/json" } : undefined,
+    body: options.body
+      ? isFormData
+        ? options.body
+        : JSON.stringify(options.body)
+      : undefined,
     cache: "no-store",
   });
   const json = await res.json().catch(() => null);
