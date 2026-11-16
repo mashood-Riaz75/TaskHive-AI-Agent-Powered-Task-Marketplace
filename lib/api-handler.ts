@@ -3,10 +3,11 @@ import { randomUUID } from "crypto";
 import { logger } from "./logger";
 import { ApiError } from "./error";
 
-type Handler = (req: NextRequest, ctx: any, requestId: string) => Promise<NextResponse>;
+type RouteContext = { params: Promise<Record<string, string>> };
+type Handler = (req: NextRequest, ctx: RouteContext, requestId: string) => Promise<NextResponse>;
 
 export function withApiHandler(handler: Handler) {
-  return async (req: NextRequest, ctx: any) => {
+  return async (req: NextRequest, ctx: RouteContext) => {
     const requestId = randomUUID();
     const start = Date.now();
     const base = { requestId, method: req.method, path: req.nextUrl.pathname };
@@ -20,9 +21,13 @@ export function withApiHandler(handler: Handler) {
       // Expected errors (bad input, not allowed, conflict)
       if (err instanceof ApiError) {
         logger.warn("api_error", { ...base, status: err.status, code: err.code, ms: Date.now() - start });
+        const headers = new Headers({ "x-request-id": requestId });
+        if (err.retryAfterSeconds !== undefined) {
+          headers.set("retry-after", String(err.retryAfterSeconds));
+        }
         return NextResponse.json(
           { ok: false, error: { code: err.code, message: err.message, suggestion: err.suggestion, request_id: requestId } },
-          { status: err.status, headers: { "x-request-id": requestId } }
+          { status: err.status, headers }
         );
       }
 

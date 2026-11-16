@@ -5,7 +5,7 @@ import { requireActor } from "@/lib/auth/guards";
 import { deleteTask, getTaskById, updateTask } from "@/app/services/task-service";
 import { parseBody, updateTaskSchema } from "@/lib/validation";
 
-async function getTaskId(ctx: { params: Promise<{ id: string }> }) {
+async function getTaskId(ctx: { params: Promise<Record<string, string>> }) {
   const { id } = await ctx.params;
   const taskId = Number(id);
   if (!Number.isInteger(taskId) || taskId < 1) {

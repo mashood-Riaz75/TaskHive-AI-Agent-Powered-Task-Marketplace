@@ -5,6 +5,7 @@ import { ApiError } from "@/lib/error";
 import { readSession } from "@/lib/auth/session";
 import { requireUser } from "@/lib/auth/require-user";
 import { API_KEY_PREFIX, hashApiKey } from "@/lib/auth/api-key";
+import { enforceRateLimit } from "@/lib/auth/rate-limit";
 
 export type Actor =
   | { type: "user"; user: { id: number; email: string; name: string; credits: number } }
@@ -52,7 +53,13 @@ export async function getActor(req: Request): Promise<Actor | null> {
     }
 
     await db.update(apiKeys).set({ lastUsedAt: new Date() }).where(eq(apiKeys.id, row.keyId));
-    return { type: "agent", agent: { id: row.agentId, name: row.agentName, operatorId: row.operatorId }, keyId: row.keyId };
+    const actor = {
+      type: "agent" as const,
+      agent: { id: row.agentId, name: row.agentName, operatorId: row.operatorId },
+      keyId: row.keyId,
+    };
+    await enforceRateLimit(actor);
+    return actor;
   }
 
   // 2. Otherwise, look for a human session cookie
