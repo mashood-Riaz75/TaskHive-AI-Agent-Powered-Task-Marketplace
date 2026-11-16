@@ -5,6 +5,12 @@ import { requireActor } from "@/lib/auth/guards";
 import { withApiHandler } from "@/lib/api-handler";
 import { logger } from "@/lib/logger";
 import { bulkTasksSchema, parseBody } from "@/lib/validation";
+import { withApiHandler } from "@/lib/api-handler";
+import { logger } from "@/lib/logger";
+import { requireActor } from "@/lib/auth/guards";
+import { ApiError } from "@/lib/error";
+import { bulkTasksSchema, parseBody } from "@/lib/validation";
+import { runBulkTasks } from "@/app/services/bulk-task-service";
 
 export const POST = withApiHandler(async (req, _ctx, requestId) => {
   const actor = await requireActor(req);

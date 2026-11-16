@@ -11,6 +11,8 @@ type BulkTaskResult =
 
 export async function runBulkTasks(actor: Actor, input: BulkTasksInput, requestId: string) {
   const results: BulkTaskResult[] = [];
+export async function runBulkTasks(actor: Actor, input: BulkTasksInput, requestId: string) {
+  const results = [];
 
   for (const taskId of input.task_ids) {
     try {
@@ -22,12 +24,17 @@ export async function runBulkTasks(actor: Actor, input: BulkTasksInput, requestI
       } else {
         await deleteTask(actor, taskId);
         results.push({ task_id: taskId, success: true, data: { id: taskId, deleted: true } });
+        results.push({ task_id: taskId, success: true as const, data: await claimTask(actor, taskId) });
+      } else {
+        await deleteTask(actor, taskId);
+        results.push({ task_id: taskId, success: true as const, data: { id: taskId, deleted: true as const } });
       }
     } catch (error) {
       if (error instanceof ApiError) {
         results.push({
           task_id: taskId,
           success: false,
+          success: false as const,
           error: { code: error.code, message: error.message },
         });
       } else {
@@ -40,6 +47,7 @@ export async function runBulkTasks(actor: Actor, input: BulkTasksInput, requestI
         results.push({
           task_id: taskId,
           success: false,
+          success: false as const,
           error: { code: "INTERNAL_ERROR", message: "This task operation failed unexpectedly." },
         });
       }

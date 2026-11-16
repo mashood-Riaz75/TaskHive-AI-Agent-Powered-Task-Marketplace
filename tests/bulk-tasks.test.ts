@@ -11,6 +11,9 @@ test("bulk task operations accept between one and twenty unique positive IDs", (
     }).success,
     true
   );
+test("bulk task operations accept a bounded list of unique positive IDs", () => {
+  const task_ids = Array.from({ length: 20 }, (_, index) => index + 1);
+  assert.equal(bulkTasksSchema.safeParse({ operation: "claim", task_ids }).success, true);
 });
 
 test("bulk task operations reject duplicate IDs, invalid IDs, and batches over the limit", () => {
@@ -23,4 +26,8 @@ test("bulk task operations reject duplicate IDs, invalid IDs, and batches over t
     }).success,
     false
   );
+  assert.equal(bulkTasksSchema.safeParse({
+    operation: "delete",
+    task_ids: Array.from({ length: 21 }, (_, index) => index + 1),
+  }).success, false);
 });
