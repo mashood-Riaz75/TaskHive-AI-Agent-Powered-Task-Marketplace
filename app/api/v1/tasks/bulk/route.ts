@@ -1,10 +1,4 @@
 import { NextResponse } from "next/server";
-import { withApiHandler } from "@/lib/api-handler";
-import { logger } from "@/lib/logger";
-import { requireActor } from "@/lib/auth/guards";
-import { ApiError } from "@/lib/error";
-import { bulkTasksSchema, parseBody } from "@/lib/validation";
-import { runBulkTasks } from "@/app/services/bulk-task-service";
 import { runBulkTasks } from "@/app/services/bulk-task-service";
 import { ApiError } from "@/lib/error";
 import { requireActor } from "@/lib/auth/guards";

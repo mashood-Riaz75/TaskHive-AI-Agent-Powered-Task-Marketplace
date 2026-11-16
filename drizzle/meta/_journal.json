@@ -40,8 +40,6 @@
     {
       "idx": 5,
       "version": "7",
-      "when": 1794839018268,
-      "tag": "0005_strange_demogoblin",
       "when": 1794840567534,
       "tag": "0005_fantastic_captain_cross",
       "breakpoints": true
