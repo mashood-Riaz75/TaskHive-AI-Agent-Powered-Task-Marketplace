@@ -22,6 +22,11 @@ const statusHint: Record<string, string> = {
   cancelled: "This task was cancelled.",
 };
 
+async function fetchTask(id: string) {
+  const { data } = await api<{ task: Task }>(`/tasks/${id}`);
+  return data.task;
+}
+
 function TaskDetailContent() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
@@ -32,8 +37,7 @@ function TaskDetailContent() {
 
   const load = useCallback(async () => {
     try {
-      const { data } = await api<{ task: Task }>(`/tasks/${id}`);
-      setTask(data.task);
+      setTask(await fetchTask(id));
     } catch (err) {
       if (err instanceof ClientApiError && err.status === 401) {
         router.push("/login");
@@ -44,8 +48,24 @@ function TaskDetailContent() {
   }, [id, router]);
 
   useEffect(() => {
-    load();
-  }, [load]);
+    let active = true;
+    fetchTask(id)
+      .then((task) => {
+        if (active) setTask(task);
+      })
+      .catch((err) => {
+        if (!active) return;
+        if (err instanceof ClientApiError && err.status === 401) {
+          router.push("/login");
+        } else {
+          setError(errorText(err));
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [id, router]);
 
   if (error) {
     return (

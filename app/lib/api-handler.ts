@@ -3,10 +3,11 @@ import { randomUUID } from "crypto";
 import { logger } from "@/lib/logger";
 import { ApiError } from "@/lib/error";
 
-type Handler = (req: NextRequest, ctx: any, requestId: string) => Promise<NextResponse>;
+type RouteContext = { params: Promise<Record<string, string>> };
+type Handler = (req: NextRequest, ctx: RouteContext, requestId: string) => Promise<NextResponse>;
 
 export function withApiHandler(handler: Handler) {
-  return async (req: NextRequest, ctx: any) => {
+  return async (req: NextRequest, ctx: RouteContext) => {
     const requestId = randomUUID();
     const start = Date.now();
     const base = { requestId, method: req.method, path: req.nextUrl.pathname };

@@ -9,6 +9,14 @@ import StatusBadge from "@/app/components/StatusBadge";
 import TaskActions from "@/app/components/TaskActions";
 import { buttonClass, cardClass, inputClass, linkClass } from "@/app/components/ui";
 
+async function fetchTasks(status: string, category: string, cursor?: string) {
+  const params = new URLSearchParams({ limit: "5" });
+  if (status) params.set("status", status);
+  if (category) params.set("category", category);
+  if (cursor) params.set("cursor", cursor);
+  return api<{ tasks: Task[] }, ListMeta>(`/tasks?${params}`);
+}
+
 export default function TasksPage() {
   const router = useRouter();
   const { user } = useMe();
@@ -17,7 +25,7 @@ export default function TasksPage() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [status, setStatus] = useState("");
   const [category, setCategory] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(
@@ -25,11 +33,7 @@ export default function TasksPage() {
       setLoading(true);
       setError(null);
       try {
-        const params = new URLSearchParams({ limit: "5" });
-        if (status) params.set("status", status);
-        if (category) params.set("category", category);
-        if (cursor) params.set("cursor", cursor);
-        const { data, meta } = await api<{ tasks: Task[] }, ListMeta>(`/tasks?${params}`);
+        const { data, meta } = await fetchTasks(status, category, cursor);
         setTasks((prev) => (cursor ? [...prev, ...data.tasks] : data.tasks));
         setMeta(meta ?? null);
       } catch (err) {
@@ -43,8 +47,27 @@ export default function TasksPage() {
   );
 
   useEffect(() => {
-    load();
-  }, [load]);
+    let active = true;
+    fetchTasks(status, category)
+      .then(({ data, meta }) => {
+        if (!active) return;
+        setTasks(data.tasks);
+        setMeta(meta ?? null);
+        setError(null);
+      })
+      .catch((err) => {
+        if (!active) return;
+        if (err instanceof ClientApiError && err.status === 401) router.push("/login");
+        else setError(errorText(err));
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [status, category, router]);
 
   useEffect(() => {
     api<{ categories: Category[] }>("/categories")
@@ -62,7 +85,11 @@ export default function TasksPage() {
       <div className="flex gap-3">
         <div>
           <label htmlFor="status" className="mb-1 block text-sm">Status</label>
-          <select id="status" value={status} onChange={(e) => setStatus(e.target.value)} className={inputClass}>
+          <select id="status" value={status} onChange={(e) => {
+            setLoading(true);
+            setError(null);
+            setStatus(e.target.value);
+          }} className={inputClass}>
             <option value="">All</option>
             <option value="open">Open</option>
             <option value="claimed">Claimed</option>
@@ -72,7 +99,11 @@ export default function TasksPage() {
         </div>
         <div>
           <label htmlFor="category" className="mb-1 block text-sm">Category</label>
-          <select id="category" value={category} onChange={(e) => setCategory(e.target.value)} className={inputClass}>
+          <select id="category" value={category} onChange={(e) => {
+            setLoading(true);
+            setError(null);
+            setCategory(e.target.value);
+          }} className={inputClass}>
             <option value="">All</option>
             {categories.map((c) => (
               <option key={c.id} value={c.slug}>{c.name}</option>
