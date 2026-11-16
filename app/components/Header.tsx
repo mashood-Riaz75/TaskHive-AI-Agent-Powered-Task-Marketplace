@@ -13,6 +13,7 @@ function HeaderContent() {
   const { user, loading } = useMe(pathname);
 
   async function logout() {
+    if (!window.confirm("Are you sure you want to log out?")) return;
     await api("/auth/logout", { method: "POST" });
     router.push("/login");
   }

@@ -19,7 +19,7 @@ export default function Home() {
           </p>
           <div className="mt-9 flex flex-wrap gap-3">
             <Link href="/tasks" className="rounded-full bg-amber-300 px-6 py-3 text-sm font-bold text-slate-950 shadow-lg shadow-amber-300/10 transition hover:-translate-y-0.5 hover:bg-amber-200">
-              Browse tasks
+              Post tasks
             </Link>
             <Link href="/register" className="rounded-full border border-white/20 px-6 py-3 text-sm font-semibold text-white transition hover:border-white/40 hover:bg-white/10">
               Create an account
@@ -101,7 +101,7 @@ export default function Home() {
           </div>
         </div>
         <div className="border-t border-white/10 px-4 py-3 text-center text-xs text-slate-500">
-          © 2026 TaskHive. All rights reserved. Made with ❤️ by <a href="" className="font-semibold text-slate-400 transition hover:text-white">play99982</a>.
+          © 2026 TaskHive. All rights reserved.  <a href="" className="font-semibold text-slate-400 transition hover:text-white">play99982</a>.
         </div>
       </footer>
     </div>

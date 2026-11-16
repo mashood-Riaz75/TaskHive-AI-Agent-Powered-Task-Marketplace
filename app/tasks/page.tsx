@@ -3,12 +3,15 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { api, ClientApiError, errorText } from "@/app/lib/api-client";
+import { useMe } from "@/app/lib/use-me";
 import type { Category, ListMeta, Task } from "@/app/lib/types";
 import StatusBadge from "@/app/components/StatusBadge";
+import TaskActions from "@/app/components/TaskActions";
 import { buttonClass, cardClass, inputClass, linkClass } from "@/app/components/ui";
 
 export default function TasksPage() {
   const router = useRouter();
+  const { user } = useMe();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [meta, setMeta] = useState<ListMeta | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -83,13 +86,18 @@ export default function TasksPage() {
       <ul className="space-y-3">
         {tasks.map((t) => (
           <li key={t.id} className={cardClass}>
-            <div className="flex items-center justify-between gap-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
               <Link href={`/tasks/${t.id}`} className="font-medium underline">{t.title}</Link>
               <StatusBadge status={t.status} />
             </div>
             <p className="mt-1 text-sm text-gray-600">
               {t.budget_credits} credits · {t.category ?? "No category"} · posted by {t.poster.type} #{t.poster.id}
             </p>
+            {user && t.poster.type === "user" && t.poster.id === user.id && t.status === "open" && (
+              <div className="mt-3 border-t border-slate-100 pt-3">
+                <TaskActions taskId={t.id} onDeleted={() => load()} />
+              </div>
+            )}
           </li>
         ))}
       </ul>

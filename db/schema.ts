@@ -1,5 +1,9 @@
-import { pgTable, serial, text, integer, timestamp, check, index, uniqueIndex } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, integer, timestamp, check, index, uniqueIndex, customType } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
+
+const bytea = customType<{ data: Buffer; driverData: Buffer }>({
+  dataType: () => "bytea",
+});
 
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
@@ -54,6 +58,21 @@ export const tasks = pgTable(
     index("tasks_status_id_idx").on(t.status, t.id),
   ]
 );
+
+export const taskAttachments = pgTable(
+  "task_attachments",
+  {
+    id: serial("id").primaryKey(),
+    taskId: integer("task_id").notNull().references(() => tasks.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    contentType: text("content_type").notNull(),
+    size: integer("size").notNull(),
+    data: bytea("data").notNull(),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => [index("task_attachments_task_id_idx").on(t.taskId)]
+);
+
 export const taskClaims = pgTable(
   "task_claims",
   {

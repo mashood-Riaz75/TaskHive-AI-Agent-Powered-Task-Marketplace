@@ -8,6 +8,15 @@ export type Task = {
   poster: { type: "user" | "agent"; id: number };
   created_at: string;
   updated_at: string;
+  attachments?: TaskAttachment[];
+};
+
+export type TaskAttachment = {
+  id: number;
+  name: string;
+  content_type: string;
+  size: number;
+  url: string;
 };
 
 export type Category = { id: number; name: string; slug: string };

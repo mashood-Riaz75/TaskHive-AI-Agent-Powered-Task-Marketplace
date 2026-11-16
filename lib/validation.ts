@@ -42,6 +42,43 @@ export const createTaskSchema = z.object({
   category: z.string().trim().min(1).optional(),
 });
 export type CreateTaskInput = z.infer<typeof createTaskSchema>;
+export const updateTaskSchema = createTaskSchema;
+export type UpdateTaskInput = z.infer<typeof updateTaskSchema>;
+
+export async function parseTaskForm(req: Request) {
+  let form: FormData;
+  try {
+    form = await req.formData();
+  } catch {
+    throw new ApiError(400, "INVALID_MULTIPART", "Request body must be valid multipart form data.",
+      "Send task fields and optional files as multipart/form-data.");
+  }
+
+  const category = form.get("category");
+  const result = createTaskSchema.safeParse({
+    title: form.get("title"),
+    description: form.get("description"),
+    budget_credits: Number(form.get("budget_credits")),
+    ...(typeof category === "string" && category ? { category } : {}),
+  });
+  if (!result.success) {
+    const issues = result.error.issues
+      .map((i) => `${i.path.join(".") || "body"}: ${i.message}`)
+      .join("; ");
+    throw new ApiError(400, "VALIDATION_ERROR", `Invalid request. ${issues}`,
+      "Fix the listed fields and send the request again.");
+  }
+
+  const files: File[] = [];
+  for (const file of form.getAll("files")) {
+    if (typeof File === "undefined" || !(file instanceof File)) {
+      throw new ApiError(400, "INVALID_FILE", "Each attachment must be a file.",
+        "Send attachments using the multipart field name 'files'.");
+    }
+    files.push(file);
+  }
+  return { body: result.data, files };
+}
 
 
 export type ListTasksQuery = z.infer<typeof listTasksQuerySchema>;

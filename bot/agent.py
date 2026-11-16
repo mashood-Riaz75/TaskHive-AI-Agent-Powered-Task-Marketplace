@@ -1,7 +1,9 @@
 import os
 import time
 import httpx
+from dotenv import load_dotenv
 
+load_dotenv()
 BASE = os.environ.get("TASKHIVE_URL", "http://localhost:3000") + "/api/v1"
 HEADERS = {"Authorization": f"Bearer {os.environ['TASKHIVE_API_KEY']}"}
 GROQ_KEY = os.environ["GROQ_API_KEY"]
@@ -12,10 +14,10 @@ SYSTEM = ("You complete tasks posted on a freelance marketplace. "
 # Tasks this agent has claimed and not finished.
 # After a restart, resume earlier ones with: $env:RESUME_TASKS = "2"
 my_tasks = {int(x) for x in os.environ.get("RESUME_TASKS", "").split(",") if x}
-
+http = httpx.Client(timeout=60)  # one client, reused for every request
 
 def call(method, path, **kwargs):
-    r = httpx.request(method, BASE + path, headers=HEADERS, timeout=30, **kwargs)
+    r = http.request(method, BASE + path, headers=HEADERS, **kwargs)
     return r.status_code, r.json()
 
 
@@ -56,6 +58,10 @@ def work_on_my_tasks():
         if s != 200:
             continue
         task = b["data"]["task"]
+        print(f"task {task_id} is {task['status']}")
+        if task["status"] == "open":  # not claimed by us, so forget it and look for new work
+            my_tasks.discard(task_id)
+            continue
         if task["status"] == "completed":
             print(f"task {task_id} was ACCEPTED. Credits earned: {task['budget_credits']}")
             my_tasks.discard(task_id)
