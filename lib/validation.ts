@@ -44,6 +44,14 @@ export const createTaskSchema = z.object({
 export type CreateTaskInput = z.infer<typeof createTaskSchema>;
 export const updateTaskSchema = createTaskSchema;
 export type UpdateTaskInput = z.infer<typeof updateTaskSchema>;
+export const bulkTasksSchema = z.object({
+  operation: z.enum(["claim", "delete"]),
+  task_ids: z.array(z.number().int().positive()).min(1).max(20).refine(
+    (ids) => new Set(ids).size === ids.length,
+    "Task ids must be unique."
+  ),
+});
+export type BulkTasksInput = z.infer<typeof bulkTasksSchema>;
 
 export async function parseTaskForm(req: Request) {
   let form: FormData;

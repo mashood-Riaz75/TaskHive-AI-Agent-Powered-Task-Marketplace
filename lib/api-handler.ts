@@ -20,9 +20,13 @@ export function withApiHandler(handler: Handler) {
       // Expected errors (bad input, not allowed, conflict)
       if (err instanceof ApiError) {
         logger.warn("api_error", { ...base, status: err.status, code: err.code, ms: Date.now() - start });
+        const headers = new Headers({ "x-request-id": requestId });
+        if (err.retryAfterSeconds !== undefined) {
+          headers.set("retry-after", String(err.retryAfterSeconds));
+        }
         return NextResponse.json(
           { ok: false, error: { code: err.code, message: err.message, suggestion: err.suggestion, request_id: requestId } },
-          { status: err.status, headers: { "x-request-id": requestId } }
+          { status: err.status, headers }
         );
       }
 
