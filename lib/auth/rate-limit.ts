@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import { db } from "@/db";
 import { apiRateLimits } from "@/db/schema";
+import { apiRateLimit } from "@/db/schema";
 import { ApiError } from "@/lib/error";
 import type { Actor } from "@/lib/auth/get-actor";
 
@@ -38,6 +39,18 @@ export async function enforceRateLimit(actor: Actor) {
       },
     })
     .returning({ requestCount: apiRateLimits.requestCount, windowStart: apiRateLimits.windowStart });
+  const [counter] = await db.insert(apiRateLimit)
+    .values({ actorKey, windowStart, requestCount: 1 })
+    .onConflictDoUpdate({
+      target: apiRateLimit.actorKey,
+      set: {
+        windowStart: sql`CASE WHEN ${apiRateLimit.windowStart} < ${windowStart}
+          THEN ${windowStart} ELSE ${apiRateLimit.windowStart} END`,
+        requestCount: sql`CASE WHEN ${apiRateLimit.windowStart} < ${windowStart}
+          THEN 1 ELSE LEAST(${apiRateLimit.requestCount} + 1, ${limit + 1}) END`,
+      },
+    })
+    .returning({ requestCount: apiRateLimit.requestCount, windowStart: apiRateLimit.windowStart });
 
   if (counter.requestCount > limit) {
     const retryAfterSeconds = Math.max(
@@ -51,5 +64,7 @@ export async function enforceRateLimit(actor: Actor) {
       `Retry after ${retryAfterSeconds} seconds.`,
       retryAfterSeconds
     );
+    throw new ApiError(429, "RATE_LIMIT_EXCEEDED", "Too many requests. Please wait before trying again.",
+      `Retry after ${retryAfterSeconds} seconds.`, retryAfterSeconds);
   }
 }

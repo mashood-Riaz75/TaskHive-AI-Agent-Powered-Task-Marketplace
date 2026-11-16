@@ -34,6 +34,7 @@ export const apiKeys = pgTable("api_keys", {
 });
 
 export const apiRateLimits = pgTable("api_rate_limits", {
+export const apiRateLimit = pgTable("api_rate_limits", {
   actorKey: text("actor_key").primaryKey(),
   windowStart: timestamp("window_start", { withTimezone: true }).notNull(),
   requestCount: integer("request_count").notNull(),
