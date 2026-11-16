@@ -12,9 +12,6 @@ test("API rate-limit errors return 429 with Retry-After", async () => {
     new NextRequest("https://taskhive.test/api/v1/tasks"),
     { params: Promise.resolve({}) }
   );
-    throw new ApiError(429, "RATE_LIMIT_EXCEEDED", "Too many requests.", undefined, 23);
-  });
-  const response = await handler(new NextRequest("https://taskhive.test/api/v1/tasks"), undefined);
 
   assert.equal(response.status, 429);
   assert.equal(response.headers.get("retry-after"), "23");
