@@ -3,7 +3,8 @@ export class ApiError extends Error {
     public status: number,
     public code: string,
     message: string,
-    public suggestion?: string
+    public suggestion?: string,
+    public retryAfterSeconds?: number
   ) {
     super(message);
   }
