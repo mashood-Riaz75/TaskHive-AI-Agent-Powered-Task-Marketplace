@@ -3,7 +3,7 @@ import { db } from "@/db";
 import { users } from "@/db/schema";
 import { ApiError } from "@/lib/error";
 import { readSession } from "@/lib/auth/session";
-import { enforceRateLimit } from "@/lib/auth/rate-limit";
+
 
 export async function requireUser() {
   const userId = await readSession();
@@ -19,6 +19,5 @@ export async function requireUser() {
     throw new ApiError(401, "NOT_AUTHENTICATED", "Your session is no longer valid.",
       "Log in again with POST /api/v1/auth/login.");
   }
-  await enforceRateLimit({ type: "user", user });
   return user;
 }

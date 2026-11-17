@@ -1,3 +1,4 @@
+
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { agents, apiKeys } from "@/db/schema";
@@ -5,11 +6,26 @@ import { ApiError } from "@/lib/error";
 import { readSession } from "@/lib/auth/session";
 import { requireUser } from "@/lib/auth/require-user";
 import { API_KEY_PREFIX, hashApiKey } from "@/lib/auth/api-key";
-import { enforceRateLimit } from "@/lib/auth/rate-limit";
 
 export type Actor =
-  | { type: "user"; user: { id: number; email: string; name: string; credits: number } }
-  | { type: "agent"; agent: { id: number; name: string; operatorId: number }; keyId: number };
+  | {
+      type: "user";
+      user: {
+        id: number;
+        email: string;
+        name: string;
+        credits: number;
+      };
+    }
+  | {
+      type: "agent";
+      agent: {
+        id: number;
+        name: string;
+        operatorId: number;
+      };
+      keyId: number;
+    };
 
 const BAD_KEY_HINT =
   "Create an agent with POST /api/v1/agents (logged in as a human), then send: Authorization: Bearer th_agent_...";
@@ -17,17 +33,27 @@ const BAD_KEY_HINT =
 export async function getActor(req: Request): Promise<Actor | null> {
   const header = req.headers.get("authorization");
 
-  // 1. An Authorization header means the caller claims to be an agent
   if (header) {
     const match = header.match(/^Bearer\s+(.+)$/i);
+
     if (!match) {
-      throw new ApiError(401, "INVALID_AUTH_HEADER",
+      throw new ApiError(
+        401,
+        "INVALID_AUTH_HEADER",
         "The Authorization header must look like: Bearer <api_key>.",
-        "Send the header exactly as: Authorization: Bearer th_agent_...");
+        "Send the header exactly as: Authorization: Bearer th_agent_..."
+      );
     }
+
     const key = match[1].trim();
+
     if (!key.startsWith(API_KEY_PREFIX)) {
-      throw new ApiError(401, "INVALID_API_KEY", "That is not a TaskHive agent API key.", BAD_KEY_HINT);
+      throw new ApiError(
+        401,
+        "INVALID_API_KEY",
+        "That is not a TaskHive agent API key.",
+        BAD_KEY_HINT
+      );
     }
 
     const [row] = await db
@@ -45,26 +71,44 @@ export async function getActor(req: Request): Promise<Actor | null> {
       .limit(1);
 
     if (!row || row.revokedAt) {
-      throw new ApiError(401, "INVALID_API_KEY", "This API key is invalid or has been revoked.", BAD_KEY_HINT);
-    }
-    if (row.status !== "active") {
-      throw new ApiError(403, "AGENT_SUSPENDED", "This agent is suspended and cannot make requests.",
-        "Contact the agent's operator.");
+      throw new ApiError(
+        401,
+        "INVALID_API_KEY",
+        "This API key is invalid or has been revoked.",
+        BAD_KEY_HINT
+      );
     }
 
-    await db.update(apiKeys).set({ lastUsedAt: new Date() }).where(eq(apiKeys.id, row.keyId));
-    const actor = {
-      type: "agent" as const,
-      agent: { id: row.agentId, name: row.agentName, operatorId: row.operatorId },
+    if (row.status !== "active") {
+      throw new ApiError(
+        403,
+        "AGENT_SUSPENDED",
+        "This agent is suspended and cannot make requests.",
+        "Contact the agent's operator."
+      );
+    }
+
+    await db
+      .update(apiKeys)
+      .set({ lastUsedAt: new Date() })
+      .where(eq(apiKeys.id, row.keyId));
+
+    return {
+      type: "agent",
+      agent: {
+        id: row.agentId,
+        name: row.agentName,
+        operatorId: row.operatorId,
+      },
       keyId: row.keyId,
     };
-    await enforceRateLimit(actor);
-    return actor;
   }
 
-  // 2. Otherwise, look for a human session cookie
   if (await readSession()) {
-    return { type: "user", user: await requireUser() };
+    return {
+      type: "user",
+      user: await requireUser(),
+    };
   }
 
   return null;
