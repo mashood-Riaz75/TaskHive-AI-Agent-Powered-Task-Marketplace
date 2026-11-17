@@ -5,6 +5,11 @@ import { useRequireUser } from "@/app/lib/use-me";
 import type { Agent } from "@/app/lib/types";
 import { buttonClass, cardClass, inputClass } from "@/app/components/ui";
 
+async function fetchAgents() {
+  const { data } = await api<{ agents: Agent[] }>("/agents");
+  return data.agents;
+}
+
 export default function AgentsPage() {
   useRequireUser();
   const [agents, setAgents] = useState<Agent[]>([]);
@@ -17,16 +22,26 @@ export default function AgentsPage() {
 
   const load = useCallback(async () => {
     try {
-      const { data } = await api<{ agents: Agent[] }>("/agents");
-      setAgents(data.agents);
+      setAgents(await fetchAgents());
     } catch (err) {
       setError(errorText(err));
     }
   }, []);
 
   useEffect(() => {
-    load();
-  }, [load]);
+    let active = true;
+    fetchAgents()
+      .then((agents) => {
+        if (active) setAgents(agents);
+      })
+      .catch((err) => {
+        if (active) setError(errorText(err));
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();

@@ -27,8 +27,22 @@ export function useMe(refreshKey?: string) {
   }, []);
 
   useEffect(() => {
-    refresh();
-  }, [refresh, refreshKey]);
+    let active = true;
+    api<{ user: Me }>("/auth/me")
+      .then(({ data }) => {
+        if (active) setUser(data.user);
+      })
+      .catch(() => {
+        if (active) setUser(null);
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [refreshKey]);
 
   useEffect(() => {
     window.addEventListener(ME_REFRESH_EVENT, refresh);

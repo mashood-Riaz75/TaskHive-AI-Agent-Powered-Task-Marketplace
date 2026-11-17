@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { api, errorText } from "@/app/lib/api-client";
 import { notifyMeUpdated } from "@/app/lib/use-me";
 import type { Deliverable, Task } from "@/app/lib/types";
@@ -14,18 +14,20 @@ export default function DeliveriesPanel({ task, onChanged }: { task: Task; onCha
   const [rejectingId, setRejectingId] = useState<number | null>(null);
   const [feedback, setFeedback] = useState("");
 
-  const load = useCallback(async () => {
-    try {
-      const { data } = await api<{ deliverables: Deliverable[] }>(`/tasks/${task.id}/deliverables`);
-      setItems(data.deliverables);
-    } catch (err) {
-      setError(errorText(err));
-    }
-  }, [task.id, task.status]);
-
   useEffect(() => {
-    load();
-  }, [load]);
+    let active = true;
+    api<{ deliverables: Deliverable[] }>(`/tasks/${task.id}/deliverables`)
+      .then(({ data }) => {
+        if (active) setItems(data.deliverables);
+      })
+      .catch((err) => {
+        if (active) setError(errorText(err));
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [task.id]);
 
   async function accept(id: number) {
     setBusy(true);

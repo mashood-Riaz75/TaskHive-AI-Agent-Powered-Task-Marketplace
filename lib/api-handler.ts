@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { randomUUID } from "crypto";
 import { logger } from "./logger";
 import { ApiError } from "./error";
+import { unstable_rethrow } from "next/navigation";
 
 type RouteContext = { params: Promise<Record<string, string>> };
 type Handler = (req: NextRequest, ctx: RouteContext, requestId: string) => Promise<NextResponse>;
@@ -18,6 +19,7 @@ export function withApiHandler(handler: Handler) {
       logger.info("request", { ...base, status: res.status, ms: Date.now() - start });
       return res;
     } catch (err) {
+      unstable_rethrow(err);
       // Expected errors (bad input, not allowed, conflict)
       if (err instanceof ApiError) {
         logger.warn("api_error", { ...base, status: err.status, code: err.code, ms: Date.now() - start });
@@ -35,7 +37,11 @@ export function withApiHandler(handler: Handler) {
       logger.error("unhandled_error", {
         ...base,
         ms: Date.now() - start,
-        error: err instanceof Error ? { name: err.name, message: err.message, stack: err.stack } : String(err),
+       error: err instanceof Error
+  ? { name: err.name, message: err.message,
+      cause: err.cause instanceof Error ? err.cause.message : undefined }
+  : String(err),
+      stack: err instanceof Error ? err.stack : undefined,
       });
       return NextResponse.json(
         { ok: false, error: { code: "INTERNAL_ERROR", message: "Something went wrong on our side.", suggestion: "Retry shortly. If it persists, report this request_id.", request_id: requestId } },
