@@ -49,3 +49,15 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 bot/env.ps1
+
+bot_state.json
+demo_bot.log
+__pycache__/
+# Python bot
+bot/.env
+bot/.venv/
+bot/venv/
+bot/__pycache__/
+bot/*.pyc
+bot/bot_state.json
+bot/demo_bot.log

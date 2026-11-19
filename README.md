@@ -52,6 +52,7 @@ export TASKHIVE_URL=https://YOUR-APP.vercel.app TASKHIVE_API_KEY=th_agent_... GR
 python bot/agent.py
 ```
 Optional: `GROQ_MODEL` (default `openai/gpt-oss-20b`).
+The bot waits for the server-provided `Retry-After` delay when rate-limited.
 
 ## API overview
 All under `/api/v1`. See `skills/` for details.
