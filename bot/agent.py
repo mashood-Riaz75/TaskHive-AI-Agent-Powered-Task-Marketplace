@@ -8,18 +8,19 @@ from pathlib import Path
 import httpx
 from dotenv import load_dotenv
 
-# --------------------------------------------------
-# CONFIGURATION
-# --------------------------------------------------
+
+# ==================================================
+# 1. CONFIGURATION
+# ==================================================
 
 load_dotenv()
 
-TASKHIVE_URL = os.getenv(
-    "TASKHIVE_URL",
-    "http://localhost:3000"
-).rstrip("/")
+TASKHIVE_URL = (
+    os.getenv("TASKHIVE_URL")
+    or "http://localhost:3000"
+).strip().rstrip("/")
 
-BASE = TASKHIVE_URL + "/api/v1"
+BASE = f"{TASKHIVE_URL}/api/v1"
 
 TASKHIVE_API_KEY = os.getenv("TASKHIVE_API_KEY")
 GROQ_KEY = os.getenv("GROQ_API_KEY")
@@ -29,20 +30,31 @@ MODEL = os.getenv(
     "openai/gpt-oss-20b"
 )
 
-POLL_INTERVAL = 15
+POLL_INTERVAL = 30
 MAX_GROQ_RETRIES = 4
+MAX_API_RETRIES = 3
 
-RESUME_TASKS = os.getenv(
-    "RESUME_TASKS", "true"
-).lower() == "true"
+RESUME_TASKS = (
+    os.getenv("RESUME_TASKS", "true").lower() == "true"
+)
 
 STATE_FILE = Path("bot_state.json")
 
+GROQ_URL = (
+    "https://api.groq.com/openai/v1/chat/completions"
+)
+
+
 if not TASKHIVE_API_KEY:
-    raise RuntimeError("TASKHIVE_API_KEY is missing")
+    raise RuntimeError(
+        "TASKHIVE_API_KEY is missing from .env"
+    )
 
 if not GROQ_KEY:
-    raise RuntimeError("GROQ_API_KEY is missing")
+    raise RuntimeError(
+        "GROQ_API_KEY is missing from .env"
+    )
+
 
 HEADERS = {
     "Authorization": f"Bearer {TASKHIVE_API_KEY}",
@@ -50,34 +62,50 @@ HEADERS = {
     "Accept": "application/json",
 }
 
-GROQ_URL = (
-    "https://api.groq.com/openai/v1/chat/completions"
-)
-
 GROQ_HEADERS = {
     "Authorization": f"Bearer {GROQ_KEY}",
     "Content-Type": "application/json",
 }
 
-# --------------------------------------------------
-# LOGGING
-# --------------------------------------------------
+
+# ==================================================
+# 2. LOGGING
+# ==================================================
 
 logging.basicConfig(
     level=logging.INFO,
-    format="%(asctime)s | %(levelname)s | %(message)s"
+    format="%(asctime)s | %(levelname)s | %(message)s",
+    handlers=[
+        logging.StreamHandler(),
+        logging.FileHandler(
+            "demo_bot.log",
+            encoding="utf-8"
+        )
+    ]
 )
 
 logger = logging.getLogger("taskhive-demo-bot")
 
-# --------------------------------------------------
-# HTTP CLIENT
-# --------------------------------------------------
 
-client = httpx.Client(timeout=30.0)
+# ==================================================
+# 3. HTTP CLIENT
+# ==================================================
+
+client = httpx.Client(
+    timeout=httpx.Timeout(
+        connect=10.0,
+        read=60.0,
+        write=20.0,
+        pool=10.0
+    ),
+    limits=httpx.Limits(
+        max_connections=10,
+        max_keepalive_connections=5
+    )
+)
 
 def api_request(method, endpoint, **kwargs):
-    """Make a TaskHive API request with error handling."""
+    """Make authenticated TaskHive API requests."""
 
     url = f"{BASE}{endpoint}"
 
@@ -94,82 +122,148 @@ def api_request(method, endpoint, **kwargs):
         if not response.content:
             return {}
 
-        return response.json()
+        try:
+            return response.json()
+
+        except ValueError:
+            logger.error(
+                "TaskHive returned invalid JSON: %s",
+                response.text[:500]
+            )
+            raise
 
     except httpx.HTTPStatusError as exc:
+
         logger.error(
             "TaskHive HTTP error %s: %s",
             exc.response.status_code,
             exc.response.text[:1000]
         )
+
         raise
 
     except httpx.RequestError as exc:
-        logger.error("TaskHive connection error: %s", exc)
+
+        logger.error(
+            "TaskHive connection error: %s",
+            exc
+        )
+
         raise
 
-    except ValueError as exc:
-        logger.error("Invalid TaskHive JSON response: %s", exc)
-        raise
 
-# --------------------------------------------------
-# PERSISTENT BOT STATE
-# --------------------------------------------------
-
-def load_state():
-    if not RESUME_TASKS:
-        return {"pending": [], "completed": []}
-
-    if not STATE_FILE.exists():
-        return {"pending": [], "completed": []}
+def retry_after_seconds(response):
+    value = response.headers.get("Retry-After")
 
     try:
-        with STATE_FILE.open("r", encoding="utf-8") as file:
-            state = json.load(file)
+        return max(1, int(value))
+    except (TypeError, ValueError):
+        return POLL_INTERVAL
+
+
+# ==================================================
+# 4. PERSISTENT BOT STATE
+# ==================================================
+
+def load_state():
+
+    default_state = {
+        "pending": [],
+        "completed": []
+    }
+
+    if not RESUME_TASKS:
+        return default_state
+
+    if not STATE_FILE.exists():
+        return default_state
+
+    try:
+
+        with STATE_FILE.open(
+            "r",
+            encoding="utf-8"
+        ) as file:
+
+            saved_state = json.load(file)
 
         return {
-            "pending": state.get("pending", []),
-            "completed": state.get("completed", [])
+            "pending": saved_state.get("pending", []),
+            "completed": saved_state.get("completed", [])
         }
 
-    except (OSError, json.JSONDecodeError):
-        logger.warning("Could not read bot state. Starting fresh.")
-        return {"pending": [], "completed": []}
+    except (
+        OSError,
+        json.JSONDecodeError,
+        AttributeError
+    ):
+
+        logger.warning(
+            "Could not load bot state. Starting fresh."
+        )
+
+        return default_state
+
+
+state = load_state()
+
 
 def save_state():
+
     if not RESUME_TASKS:
         return
 
     temp_file = STATE_FILE.with_suffix(".tmp")
 
-    temp_file.write_text(
-        json.dumps(state, indent=4),
-        encoding="utf-8"
-    )
+    try:
 
-    temp_file.replace(STATE_FILE)
+        temp_file.write_text(
+            json.dumps(state, indent=4),
+            encoding="utf-8"
+        )
 
-state = load_state()
+        temp_file.replace(STATE_FILE)
 
-# --------------------------------------------------
-# TASKHIVE CONNECTION
-# --------------------------------------------------
+    except OSError:
+
+        logger.exception(
+            "Failed to save bot state"
+        )
+
+        raise
+
+
+# ==================================================
+# 5. TASKHIVE CONNECTION
+# ==================================================
 
 def connect_to_taskhive():
+
     logger.info("Connecting to TaskHive...")
 
-    result = api_request("GET", "/whoami")
+    result = api_request(
+        "GET",
+        "/whoami"
+    )
 
     logger.info(
         "Authenticated successfully: %s",
-        json.dumps(result, ensure_ascii=False)[:500]
+        json.dumps(
+            result,
+            ensure_ascii=False
+        )[:500]
     )
 
-# --------------------------------------------------
-# TASK DISCOVERY
-# --------------------------------------------------
+    return True
+
+
+# ==================================================
+# 6. TASK DISCOVERY
+# ==================================================
+
 
 def discover_tasks():
+
     result = api_request(
         "GET",
         "/tasks",
@@ -179,113 +273,120 @@ def discover_tasks():
         }
     )
 
+    if isinstance(result, dict):
+        result = result.get("data", result)
+
     if isinstance(result, list):
         return result
 
-    return result.get("tasks", [])
+    if isinstance(result, dict):
 
-# --------------------------------------------------
-# TASK CLAIMING
-# --------------------------------------------------
+        tasks = result.get("tasks", [])
+
+        if isinstance(tasks, list):
+            return tasks
+
+    logger.warning(
+        "Unexpected task discovery response: %s",
+        str(result)[:1000]
+    )
+
+    return []
+
+    
+
+
+# ==================================================
+# 7. TASK CLAIMING
+# ==================================================
 
 def claim_task(task_id):
+
     try:
-        result = api_request(
+
+        api_request(
             "POST",
             f"/tasks/{task_id}/claims"
         )
 
-        logger.info("Claimed task %s", task_id)
+        logger.info(
+            "Successfully claimed task %s",
+            task_id
+        )
+
         return True
 
     except httpx.HTTPStatusError as exc:
-        if exc.response.status_code in (400, 409):
+
+        status = exc.response.status_code
+
+        if status in (400, 409):
+
             logger.warning(
                 "Task %s is no longer claimable",
                 task_id
             )
+
             return False
 
         raise
 
-# --------------------------------------------------
-# TASK DETAILS
-# --------------------------------------------------
+
+# ==================================================
+# 8. TASK DETAILS
+# ==================================================
 
 def get_task_details(task_id):
+
     result = api_request(
         "GET",
         f"/tasks/{task_id}"
     )
 
-    return result.get("task", result)
+    if not isinstance(result, dict):
+        raise ValueError(
+            "Invalid task details response"
+        )
 
-def get_task_deliverables(task_id):
-    result = api_request(
-        "GET",
-        f"/tasks/{task_id}/deliverables"
-    )
+    task = result.get("task", result)
 
-    if isinstance(result, list):
-        return result
+    if not isinstance(task, dict):
+        raise ValueError(
+            "Task details are missing"
+        )
 
-    return result.get("deliverables", [])
+    return task
 
-# --------------------------------------------------
-# EXISTING SUBMISSION CHECK
-# --------------------------------------------------
 
-def inspect_existing_deliverables(task_id):
-    deliverables = get_task_deliverables(task_id)
-
-    if not deliverables:
-        return False
-
-    for item in deliverables:
-        status = str(
-            item.get("status", "")
-        ).lower()
-
-        if status in {
-            "rejected",
-            "approved",
-            "submitted",
-            "pending",
-            "in_review"
-        }:
-            feedback = (
-                item.get("feedback")
-                or item.get("review_feedback")
-                or ""
-            )
-
-            logger.warning(
-                "Existing deliverable found for task %s. "
-                "Status: %s. Feedback: %s",
-                task_id,
-                status,
-                str(feedback)[:500]
-            )
-
-            return True
-
-    return False
-
-# --------------------------------------------------
-# GROQ TASK GENERATION
-# --------------------------------------------------
+# ==================================================
+# 10. GROQ TASK GENERATION
+# ==================================================
 
 def generate_work(task):
-    title = task.get("title", "Untitled task")
 
-    description = task.get("description", "")
+    title = task.get(
+        "title",
+        "Untitled task"
+    )
 
-    requirements = task.get("requirements", "")
+    description = task.get(
+        "description",
+        ""
+    )
 
-    instructions = task.get("instructions", "")
+    requirements = task.get(
+        "requirements",
+        ""
+    )
+
+    instructions = task.get(
+        "instructions",
+        ""
+    )
 
     acceptance_criteria = task.get(
-        "acceptance_criteria", ""
+        "acceptance_criteria",
+        ""
     )
 
     task_context = f"""
@@ -315,6 +416,7 @@ Your responsibility is to produce high-quality,
 complete and accurate deliverables.
 
 Rules:
+
 1. Follow the task requirements carefully.
 2. Do not invent facts or claim unperformed work.
 3. Use a clear and professional structure.
@@ -322,6 +424,8 @@ Rules:
 5. If information is missing, explicitly state
    reasonable assumptions.
 6. Return only the final deliverable.
+7. Do not claim that external actions were performed
+   unless they actually were.
 """
         },
         {
@@ -340,7 +444,9 @@ Rules:
     }
 
     for attempt in range(MAX_GROQ_RETRIES):
+
         try:
+
             response = httpx.post(
                 GROQ_URL,
                 headers=GROQ_HEADERS,
@@ -357,12 +463,23 @@ Rules:
                 ["message"]["content"]
             )
 
-            if not content or not content.strip():
-                raise ValueError("Groq returned empty content")
+            if not isinstance(content, str):
+                raise ValueError(
+                    "Groq returned invalid content"
+                )
 
-            logger.info("Work generated successfully")
+            content = content.strip()
 
-            return content.strip()
+            if not content:
+                raise ValueError(
+                    "Groq returned empty content"
+                )
+
+            logger.info(
+                "Work generated successfully"
+            )
+
+            return content
 
         except (
             httpx.TimeoutException,
@@ -370,28 +487,38 @@ Rules:
             httpx.HTTPStatusError,
             ValueError,
             KeyError,
-            IndexError
+            IndexError,
+            TypeError
         ) as exc:
 
-            if isinstance(exc, httpx.HTTPStatusError):
+            if isinstance(
+                exc,
+                httpx.HTTPStatusError
+            ):
+
                 status = exc.response.status_code
 
-                # Do not retry authentication or invalid-request errors.
                 if status in (400, 401, 403, 404):
+
                     logger.error(
                         "Non-retryable Groq error: %s",
                         exc.response.text[:500]
                     )
+
                     raise
 
             if attempt == MAX_GROQ_RETRIES - 1:
-                logger.error(
-                    "Groq failed after all retries: %s",
-                    exc
+
+                logger.exception(
+                    "Groq failed after all retries"
                 )
+
                 raise
 
-            delay = min(2 ** attempt, 30)
+            delay = min(
+                2 ** attempt,
+                30
+            )
 
             logger.warning(
                 "Groq attempt %s failed: %s. "
@@ -403,11 +530,13 @@ Rules:
 
             time.sleep(delay)
 
-# --------------------------------------------------
-# DELIVERABLE SUBMISSION
-# --------------------------------------------------
+
+# ==================================================
+# 11. DELIVERABLE SUBMISSION
+# ==================================================
 
 def submit_deliverable(task_id, work):
+
     result = api_request(
         "POST",
         f"/tasks/{task_id}/deliverables",
@@ -419,34 +548,53 @@ def submit_deliverable(task_id, work):
     logger.info(
         "Deliverable submitted for task %s: %s",
         task_id,
-        json.dumps(result, ensure_ascii=False)[:500]
+        json.dumps(
+            result,
+            ensure_ascii=False
+        )[:500]
     )
 
     return result
 
-# --------------------------------------------------
-# TASK PROCESSING
-# --------------------------------------------------
+
+# ==================================================
+# 12. TASK PROCESSING
+# ==================================================
 
 def process_task(task_id):
 
-    logger.info("Processing task %s", task_id)
+    logger.info(
+        "Processing task %s",
+        task_id
+    )
 
     try:
+
         task = get_task_details(task_id)
 
-        if inspect_existing_deliverables(task_id):
+        # A delivered task is finished from this bot's perspective; its
+        # delivery may belong to another agent.
+        if task.get("status") in {"delivered", "completed"}:
             logger.warning(
-                "Skipping task %s because a deliverable "
-                "already exists. Review it manually if rejected.",
-                task_id
+                "Skipping task %s because its status is '%s'.",
+                task_id,
+                task.get("status")
             )
-
             return True
 
+        # Generate work through Groq.
         work = generate_work(task)
 
-        submit_deliverable(task_id, work)
+        if not work:
+            raise ValueError(
+                "Generated work is empty"
+            )
+
+        # Submit completed deliverable.
+        submit_deliverable(
+            task_id,
+            work
+        )
 
         logger.info(
             "Task %s completed successfully",
@@ -455,7 +603,11 @@ def process_task(task_id):
 
         return True
 
-    except Exception:
+    except httpx.HTTPStatusError as exc:
+
+        if exc.response.status_code == 429:
+            raise
+
         logger.exception(
             "Failed to process task %s",
             task_id
@@ -463,36 +615,122 @@ def process_task(task_id):
 
         return False
 
-# --------------------------------------------------
-# MAIN BOT LOOP
-# --------------------------------------------------
+    except Exception:
+
+        logger.exception(
+            "Failed to process task %s",
+            task_id
+        )
+
+        return False
+
+
+# ==================================================
+# 13. TASK STATE MANAGEMENT
+# ==================================================
+
+def mark_task_completed(task_id):
+
+    if task_id in state["pending"]:
+        state["pending"].remove(task_id)
+
+    if task_id not in state["completed"]:
+        state["completed"].append(task_id)
+
+    save_state()
+
+
+# ==================================================
+# 14. MAIN BOT LOOP
+# ==================================================
 
 def run_bot():
 
-    logger.info("Starting TaskHive Demo Bot")
+    logger.info(
+        "Starting TaskHive Demo Bot"
+    )
 
-    connect_to_taskhive()
+    logger.info(
+        "TaskHive server: %s",
+        TASKHIVE_URL
+    )
+
+    logger.info(
+        "Groq model: %s",
+        MODEL
+    )
+
+    # ----------------------------------------------
+    # Connect to TaskHive
+    # ----------------------------------------------
 
     while True:
 
         try:
-            # Resume previously claimed tasks first.
+
+            connect_to_taskhive()
+
+            break
+
+        except httpx.RequestError:
+
+            logger.exception(
+                "TaskHive unavailable. "
+                "Retrying in 30 seconds..."
+            )
+
+            time.sleep(30)
+
+        except httpx.HTTPStatusError as exc:
+
+            status = exc.response.status_code
+
+            if status == 429:
+                retry_after = retry_after_seconds(exc.response)
+                logger.warning(
+                    "TaskHive rate limit exceeded. "
+                    "Retrying in %s seconds.",
+                    retry_after
+                )
+                time.sleep(retry_after)
+                continue
+
+            if status in (401, 403):
+                logger.critical(
+                    "TaskHive authentication failed. "
+                    "Check TASKHIVE_API_KEY."
+                )
+                raise
+
+            logger.exception(
+                "TaskHive connection failed. "
+                "Retrying in 30 seconds..."
+            )
+
+            time.sleep(30)
+
+    # ----------------------------------------------
+    # Continuous polling
+    # ----------------------------------------------
+
+    while True:
+
+        try:
+
+            # Resume previously claimed tasks.
             for task_id in list(state["pending"]):
 
                 if task_id in state["completed"]:
+
                     state["pending"].remove(task_id)
                     save_state()
+
                     continue
 
                 success = process_task(task_id)
 
                 if success:
-                    state["pending"].remove(task_id)
-
-                    if task_id not in state["completed"]:
-                        state["completed"].append(task_id)
-
-                    save_state()
+                    mark_task_completed(task_id)
 
             # Discover new tasks.
             tasks = discover_tasks()
@@ -502,12 +740,22 @@ def run_bot():
                 len(tasks)
             )
 
+            # Process one new task per polling cycle.
             for task in tasks:
 
-                task_id = str(task.get("id", ""))
+                if not isinstance(task, dict):
+                    continue
+
+                task_id = str(
+                    task.get("id", "")
+                )
 
                 if not task_id:
-                    logger.warning("Skipping task without ID")
+
+                    logger.warning(
+                        "Skipping task without ID"
+                    )
+
                     continue
 
                 if (
@@ -529,14 +777,35 @@ def run_bot():
                     success = process_task(task_id)
 
                     if success:
-                        state["pending"].remove(task_id)
-                        state["completed"].append(task_id)
-                        save_state()
+                        mark_task_completed(task_id)
 
-                    # One new task per polling cycle.
                     break
 
+        except httpx.RequestError:
+
+            logger.exception(
+                "TaskHive connection problem"
+            )
+
+        except httpx.HTTPStatusError as exc:
+
+            if exc.response.status_code == 429:
+                retry_after = retry_after_seconds(exc.response)
+                logger.warning(
+                    "TaskHive rate limit exceeded. "
+                    "Retrying in %s seconds.",
+                    retry_after
+                )
+                time.sleep(retry_after)
+                continue
+
+            logger.exception(
+                "TaskHive returned HTTP %s",
+                exc.response.status_code
+            )
+
         except Exception:
+
             logger.exception(
                 "Unexpected error in main bot loop"
             )
@@ -548,17 +817,27 @@ def run_bot():
 
         time.sleep(POLL_INTERVAL)
 
-# --------------------------------------------------
-# ENTRY POINT
-# --------------------------------------------------
+
+# ==================================================
+# 15. ENTRY POINT
+# ==================================================
 
 if __name__ == "__main__":
 
     try:
+
         run_bot()
 
     except KeyboardInterrupt:
-        logger.info("Demo Bot stopped by user")
+
+        logger.info(
+            "Demo Bot stopped by user"
+        )
 
     finally:
+
         client.close()
+
+        logger.info(
+            "HTTP client closed"
+        )
