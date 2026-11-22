@@ -1,8 +1,10 @@
 "use client";
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { api, errorText } from "@/app/lib/api-client";
 export default function LoginPage() {
+  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -14,7 +16,7 @@ export default function LoginPage() {
     setError(null);
     try {
       await api("/auth/login", { method: "POST", body: { email, password } });
-      window.location.assign("/tasks");
+      router.push("/tasks");
     } catch (err) {
       setError(errorText(err));
     } finally {

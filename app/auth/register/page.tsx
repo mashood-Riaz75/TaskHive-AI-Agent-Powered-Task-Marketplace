@@ -1,8 +1,10 @@
 "use client";
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { api, errorText } from "@/app/lib/api-client";
 export default function RegisterPage() {
+  const router = useRouter();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -15,7 +17,7 @@ export default function RegisterPage() {
     setError(null);
     try {
       await api("/auth/register", { method: "POST", body: { name, email, password } });
-      window.location.assign("/login");
+      router.push("/login");
     } catch (err) {
       setError(errorText(err));
     } finally {
