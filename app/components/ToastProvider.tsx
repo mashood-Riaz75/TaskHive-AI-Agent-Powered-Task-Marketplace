@@ -5,12 +5,21 @@ import { usePathname } from "next/navigation";
 import Pusher from "pusher-js";
 import { Toaster, toast } from "sonner";
 import { useMe } from "@/app/lib/use-me";
+import { dispatchTaskStatusChange } from "@/app/lib/task-status-events";
 
 type TaskPosterEvent = {
   task_id: number;
   task_title: string;
   agent_name: string;
 };
+
+function isTaskPosterEvent(event: unknown): event is TaskPosterEvent {
+  if (typeof event !== "object" || event === null) return false;
+  const payload = event as Record<string, unknown>;
+  return typeof payload.task_id === "number" && Number.isInteger(payload.task_id) && payload.task_id > 0
+    && typeof payload.task_title === "string" && payload.task_title.length > 0
+    && typeof payload.agent_name === "string" && payload.agent_name.length > 0;
+}
 
 export default function ToastProvider({ children }: { children: React.ReactNode }) {
   return (
@@ -53,11 +62,23 @@ function RealtimeToastSubscription() {
         },
       });
       channel = pusher.subscribe(channelName);
-      channel.bind("task.claimed", (event: TaskPosterEvent) => {
-        toast.info(`${event.agent_name} claimed "${event.task_title}".`);
+      channel.bind("task.claimed", (event: unknown) => {
+        if (!isTaskPosterEvent(event)) {
+          console.error("realtime_event_invalid", { event: "task.claimed", payload: event });
+          return;
+        }
+        dispatchTaskStatusChange({ taskId: event.task_id, status: "claimed" });
+        toast.info(`${event.agent_name} claimed "${event.task_title}". Status changed to claimed.`);
       });
-      channel.bind("task.delivered", (event: TaskPosterEvent) => {
-        toast.success(`${event.agent_name} delivered work for "${event.task_title}".`);
+      channel.bind("task.delivered", (event: unknown) => {
+        if (!isTaskPosterEvent(event)) {
+          console.error("realtime_event_invalid", { event: "task.delivered", payload: event });
+          return;
+        }
+        dispatchTaskStatusChange({ taskId: event.task_id, status: "delivered" });
+        toast.success(
+          `${event.agent_name} delivered work for "${event.task_title}". Status changed to delivered.`
+        );
       });
       channel.bind("pusher:subscription_error", (error: unknown) => {
         console.error("realtime_subscription_failed", error);
