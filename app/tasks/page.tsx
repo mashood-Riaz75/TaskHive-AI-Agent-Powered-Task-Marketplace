@@ -1,10 +1,11 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { api, ClientApiError, errorText } from "@/app/lib/api-client";
 import { useMe } from "@/app/lib/use-me";
 import type { Category, ListMeta, Task } from "@/app/lib/types";
+import { TASK_STATUS_CHANGE_EVENT } from "@/app/lib/task-status-events";
 import StatusBadge from "@/app/components/StatusBadge";
 import TaskActions from "@/app/components/TaskActions";
 import { buttonClass, cardClass, inputClass, linkClass } from "@/app/components/ui";
@@ -28,47 +29,40 @@ export default function TasksPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [categoryError, setCategoryError] = useState<string | null>(null);
+  const taskRequest = useRef(0);
 
   const load = useCallback(
     async (cursor?: string) => {
+      const requestId = ++taskRequest.current;
       setLoading(true);
       setError(null);
       try {
         const { data, meta } = await fetchTasks(status, category, cursor);
+        if (requestId !== taskRequest.current) return;
         setTasks((prev) => (cursor ? [...prev, ...data.tasks] : data.tasks));
         setMeta(meta ?? null);
       } catch (err) {
+        if (requestId !== taskRequest.current) return;
         if (err instanceof ClientApiError && err.status === 401) router.push("/login");
         else setError(errorText(err));
       } finally {
-        setLoading(false);
+        if (requestId === taskRequest.current) setLoading(false);
       }
     },
     [status, category, router]
   );
 
   useEffect(() => {
-    let active = true;
-    fetchTasks(status, category)
-      .then(({ data, meta }) => {
-        if (!active) return;
-        setTasks(data.tasks);
-        setMeta(meta ?? null);
-        setError(null);
-      })
-      .catch((err) => {
-        if (!active) return;
-        if (err instanceof ClientApiError && err.status === 401) router.push("/login");
-        else setError(errorText(err));
-      })
-      .finally(() => {
-        if (active) setLoading(false);
-      });
-
-    return () => {
-      active = false;
+    const handleTaskStatusChange = () => {
+      void load();
     };
-  }, [status, category, router]);
+    window.addEventListener(TASK_STATUS_CHANGE_EVENT, handleTaskStatusChange);
+    return () => window.removeEventListener(TASK_STATUS_CHANGE_EVENT, handleTaskStatusChange);
+  }, [load]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
 
   useEffect(() => {
     api<{ categories: Category[] }>("/categories")

@@ -18,7 +18,10 @@ export default function DeliveriesPanel({ task, onChanged }: { task: Task; onCha
     let active = true;
     api<{ deliverables: Deliverable[] }>(`/tasks/${task.id}/deliverables`)
       .then(({ data }) => {
-        if (active) setItems(data.deliverables);
+        if (active) {
+          setItems(data.deliverables);
+          setError(null);
+        }
       })
       .catch((err) => {
         if (active) setError(errorText(err));
@@ -27,7 +30,7 @@ export default function DeliveriesPanel({ task, onChanged }: { task: Task; onCha
     return () => {
       active = false;
     };
-  }, [task.id]);
+  }, [task.id, task.status]);
 
   async function accept(id: number) {
     setBusy(true);
