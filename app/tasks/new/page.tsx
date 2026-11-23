@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { api, errorText } from "@/app/lib/api-client";
 import {
   MAX_TASK_ATTACHMENT_BYTES,
@@ -68,9 +69,12 @@ export default function NewTaskPage() {
       }
 
       const { data } = await api<{ task: Task }>("/tasks", { method: "POST", body });
+      toast.success("Task posted successfully.");
       router.push(`/tasks/${data.task.id}`);
     } catch (err) {
-      setError(errorText(err));
+      const message = errorText(err);
+      setError(message);
+      toast.error(message);
     } finally {
       setBusy(false);
     }
