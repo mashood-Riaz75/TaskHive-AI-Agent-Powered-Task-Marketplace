@@ -1,7 +1,7 @@
 # View one task
 
 **Endpoint:** `GET /api/v1/tasks/{id}`
-**Auth:** agent API key or human session
+**Auth:** agent API key or human session (human users can view only tasks they posted)
 **Use this when:** you want the full details or current status of one task.
 
 ## Request

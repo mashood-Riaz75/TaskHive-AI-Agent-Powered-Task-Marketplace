@@ -10,6 +10,7 @@ import {
   TASK_ATTACHMENT_CATEGORIES,
   taskAttachmentSelectionError,
 } from "@/app/lib/task-attachments";
+import { taskOwnerFilter } from "@/app/services/task-access";
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
@@ -53,10 +54,11 @@ export async function listCategories() {
     .from(categories).orderBy(categories.name);
 }
 
-export async function getTaskById(id: number) {
+export async function getTaskById(id: number, actor: Actor) {
+  const ownerFilter = taskOwnerFilter(actor);
   const [row] = await db.select(taskSelect).from(tasks)
     .leftJoin(categories, eq(tasks.categoryId, categories.id))
-    .where(eq(tasks.id, id)).limit(1);
+    .where(and(eq(tasks.id, id), ...(ownerFilter ? [ownerFilter] : []))).limit(1);
 
   if (!row) {
     throw new ApiError(404, "TASK_NOT_FOUND", `Task ${id} does not exist.`,
@@ -81,16 +83,20 @@ export async function getTaskById(id: number) {
   };
 }
 
-export async function getTaskAttachment(taskId: number, attachmentId: number) {
+export async function getTaskAttachment(taskId: number, attachmentId: number, actor: Actor) {
+  const ownerFilter = taskOwnerFilter(actor);
   const [attachment] = await db.select({
     id: taskAttachments.id,
     name: taskAttachments.name,
     contentType: taskAttachments.contentType,
     data: taskAttachments.data,
-  }).from(taskAttachments).where(and(
-    eq(taskAttachments.taskId, taskId),
-    eq(taskAttachments.id, attachmentId)
-  )).limit(1);
+  }).from(taskAttachments)
+    .innerJoin(tasks, eq(taskAttachments.taskId, tasks.id))
+    .where(and(
+      eq(taskAttachments.taskId, taskId),
+      eq(taskAttachments.id, attachmentId),
+      ...(ownerFilter ? [ownerFilter] : [])
+    )).limit(1);
 
   if (!attachment) {
     throw new ApiError(404, "ATTACHMENT_NOT_FOUND", "This task attachment does not exist.");
@@ -152,7 +158,7 @@ export async function createTask(actor: Actor, input: CreateTaskInput, files: Fi
     });
   }
 
-  return getTaskById(taskId);
+  return getTaskById(taskId, actor);
 }
 
 async function lockEditableTask(tx: Tx, actor: Actor, taskId: number) {
@@ -205,7 +211,7 @@ export async function updateTask(actor: Actor, taskId: number, input: UpdateTask
     }).where(eq(tasks.id, task.id));
   });
 
-  return getTaskById(taskId);
+  return getTaskById(taskId, actor);
 }
 
 export async function deleteTask(actor: Actor, taskId: number) {
@@ -228,13 +234,8 @@ export async function listTasks(q: ListTasksQuery, actor: Actor) {
   const conditions: SQL[] = [];
   if (q.status) conditions.push(eq(tasks.status, q.status));
   if (q.category) conditions.push(eq(categories.slug, q.category.toLowerCase()));
-  if (q.poster === "me") {
-    conditions.push(
-      actor.type === "user"
-        ? eq(tasks.posterUserId, actor.user.id)
-        : eq(tasks.posterAgentId, actor.agent.id)
-    );
-  }
+  const ownerFilter = taskOwnerFilter(actor, q.poster === "me");
+  if (ownerFilter) conditions.push(ownerFilter);
   if (q.cursor) conditions.push(lt(tasks.id, decodeCursor(q.cursor)));
 
   const rows = await db.select(taskSelect).from(tasks)

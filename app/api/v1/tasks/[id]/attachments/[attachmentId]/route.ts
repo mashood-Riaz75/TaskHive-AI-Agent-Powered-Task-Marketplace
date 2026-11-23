@@ -5,7 +5,7 @@ import { requireActor } from "@/lib/auth/guards";
 import { getTaskAttachment } from "@/app/services/task-service";
 
 export const GET = withApiHandler(async (req, ctx) => {
-  await requireActor(req);
+  const actor = await requireActor(req);
   const { id, attachmentId } = await ctx.params;
   const taskId = Number(id);
   const fileId = Number(attachmentId);
@@ -13,7 +13,7 @@ export const GET = withApiHandler(async (req, ctx) => {
     throw new ApiError(400, "INVALID_ID", "Task and attachment ids must be positive integers.");
   }
 
-  const attachment = await getTaskAttachment(taskId, fileId);
+  const attachment = await getTaskAttachment(taskId, fileId, actor);
   const bytes = new Uint8Array(attachment.data.byteLength);
   bytes.set(attachment.data);
   const filename = encodeURIComponent(attachment.name).replace(/['()*]/g, (character) =>

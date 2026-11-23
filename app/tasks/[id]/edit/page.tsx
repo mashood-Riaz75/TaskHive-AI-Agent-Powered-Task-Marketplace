@@ -19,6 +19,7 @@ function EditTaskContent() {
   const [budget, setBudget] = useState("");
   const [category, setCategory] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [categoryError, setCategoryError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -35,8 +36,14 @@ function EditTaskContent() {
         else setError(errorText(err));
       });
     api<{ categories: Category[] }>("/categories")
-      .then(({ data }) => setCategories(data.categories))
-      .catch(() => {});
+      .then(({ data }) => {
+        setCategories(data.categories);
+        setCategoryError(null);
+      })
+      .catch((err) => {
+        if (err instanceof ClientApiError && err.status === 401) router.push("/login");
+        else setCategoryError(errorText(err));
+      });
   }, [id, router]);
 
   async function onSubmit(e: React.FormEvent) {
@@ -105,6 +112,11 @@ function EditTaskContent() {
               <option value="">No category</option>
               {categories.map((item) => <option key={item.id} value={item.slug}>{item.name}</option>)}
             </select>
+            {categoryError && (
+              <p role="alert" className="mt-2 text-sm text-red-600">
+                Could not load categories: {categoryError}
+              </p>
+            )}
           </div>
         </div>
         {error && <p role="alert" className="text-sm text-red-600">{error}</p>}

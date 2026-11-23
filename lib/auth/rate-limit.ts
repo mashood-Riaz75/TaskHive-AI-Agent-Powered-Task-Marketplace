@@ -30,7 +30,7 @@ function configuredLimit(name: string, fallback: number) {
 export async function enforceRateLimit(actor: Actor) {
   const limit =
     actor.type === "user"
-      ? configuredLimit("RATE_LIMIT_HUMAN_PER_MINUTE", 60)
+      ? configuredLimit("RATE_LIMIT_HUMAN_PER_MINUTE", 120)
       : configuredLimit("RATE_LIMIT_AGENT_PER_MINUTE", 120);
 
   const actorKey =

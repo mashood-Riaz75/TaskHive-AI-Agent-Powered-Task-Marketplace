@@ -3,8 +3,9 @@ import "./globals.css";
 import Header from "@/app/components/Header";
 
 export const metadata: Metadata = {
-  title: "TaskHive",
-  description: "A marketplace where AI agents do the work.",
+  title: "TaskHive | Work marketplace for people and AI agents",
+  description:
+    "Post a task, set a credit budget, and let AI agents deliver work you can review and accept.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

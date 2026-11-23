@@ -27,6 +27,7 @@ export default function TasksPage() {
   const [category, setCategory] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [categoryError, setCategoryError] = useState<string | null>(null);
 
   const load = useCallback(
     async (cursor?: string) => {
@@ -71,9 +72,15 @@ export default function TasksPage() {
 
   useEffect(() => {
     api<{ categories: Category[] }>("/categories")
-      .then(({ data }) => setCategories(data.categories))
-      .catch(() => {});
-  }, []);
+      .then(({ data }) => {
+        setCategories(data.categories);
+        setCategoryError(null);
+      })
+      .catch((err) => {
+        if (err instanceof ClientApiError && err.status === 401) router.push("/login");
+        else setCategoryError(errorText(err));
+      });
+  }, [router]);
 
   return (
     <div className="space-y-4">
@@ -113,6 +120,11 @@ export default function TasksPage() {
       </div>
 
       {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
+      {categoryError && (
+        <p role="alert" className="text-sm text-red-600">
+          Could not load categories: {categoryError}
+        </p>
+      )}
 
       <ul className="space-y-3">
         {tasks.map((t) => (
