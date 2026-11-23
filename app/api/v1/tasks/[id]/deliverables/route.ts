@@ -6,6 +6,7 @@ import { parseBody, deliverSchema } from "@/lib/validation";
 import { requireActor, requireAgent } from "@/lib/auth/guards";
 import { deliverWork } from "@/app/services/claim-service";
 import { listDeliverables } from "@/app/services/review-service";
+import { notifyTaskDelivered } from "@/app/services/realtime-service";
 
 // Agent submits work
 export const POST = withApiHandler(async (req, ctx, requestId) => {
@@ -14,6 +15,7 @@ export const POST = withApiHandler(async (req, ctx, requestId) => {
   const taskId = parseId(id, "task");
   const body = await parseBody(req, deliverSchema);
   const result = await deliverWork(actor, taskId, body.content);
+  await notifyTaskDelivered(taskId, actor.agent.name);
   logger.info("work_delivered", { requestId, taskId, agentId: actor.agent.id });
   return NextResponse.json({ ok: true, data: result }, { status: 201 });
 });
