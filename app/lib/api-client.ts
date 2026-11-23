@@ -7,10 +7,25 @@ export type ApiErrorBody = {
 };
 
 export class ClientApiError extends Error {
-  constructor(public status: number, public error: ApiErrorBody) {
+  constructor(
+    public status: number,
+    public error: ApiErrorBody,
+    public retryAfterSeconds?: number
+  ) {
     super(error.message);
     this.name = "ClientApiError";
   }
+}
+
+function getRetryAfterSeconds(value: string | null): number | undefined {
+  if (!value) return undefined;
+  const seconds = Number(value);
+  if (Number.isFinite(seconds) && seconds >= 0) return Math.ceil(seconds);
+
+  const retryAt = Date.parse(value);
+  return Number.isNaN(retryAt)
+    ? undefined
+    : Math.max(0, Math.ceil((retryAt - Date.now()) / 1000));
 }
 
 type ApiOptions = {
@@ -57,7 +72,8 @@ export async function api<T, M = Record<string, unknown>>(
       json?.error ?? {
         code: "BAD_RESPONSE",
         message: "The server sent an unexpected response.",
-      }
+      },
+      getRetryAfterSeconds(res.headers.get("retry-after"))
     );
   }
 
@@ -70,6 +86,10 @@ export async function api<T, M = Record<string, unknown>>(
 // Turn any error into text a person can read
 export function errorText(err: unknown): string {
   if (err instanceof ClientApiError) {
+    if (err.status === 429 && err.retryAfterSeconds !== undefined) {
+      const seconds = err.retryAfterSeconds;
+      return `${err.error.message} Retry in ${seconds} second${seconds === 1 ? "" : "s"}.`;
+    }
     return err.error.suggestion
       ? `${err.error.message} ${err.error.suggestion}`
       : err.error.message;

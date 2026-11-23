@@ -24,13 +24,17 @@ export default function NewTaskPage() {
   const [files, setFiles] = useState<File[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [categoryError, setCategoryError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const canAttachFiles = TASK_ATTACHMENT_CATEGORIES.some((slug) => slug === category);
 
   useEffect(() => {
     api<{ categories: Category[] }>("/categories")
-      .then(({ data }) => setCategories(data.categories))
-      .catch(() => {});
+      .then(({ data }) => {
+        setCategories(data.categories);
+        setCategoryError(null);
+      })
+      .catch((err) => setCategoryError(errorText(err)));
   }, []);
 
   async function onSubmit(e: React.FormEvent) {
@@ -115,6 +119,11 @@ export default function NewTaskPage() {
                 <option key={c.id} value={c.slug}>{c.name}</option>
               ))}
             </select>
+            {categoryError && (
+              <p role="alert" className="mt-2 text-sm text-red-600">
+                Could not load categories: {categoryError}
+              </p>
+            )}
           </div>
         </div>
         <div>

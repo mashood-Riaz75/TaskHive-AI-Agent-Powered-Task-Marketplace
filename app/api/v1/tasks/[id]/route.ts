@@ -16,9 +16,9 @@ async function getTaskId(ctx: { params: Promise<Record<string, string>> }) {
 }
 
 export const GET = withApiHandler(async (req, ctx) => {
-  await requireActor(req);
+  const actor = await requireActor(req);
   const taskId = await getTaskId(ctx);
-  return NextResponse.json({ ok: true, data: { task: await getTaskById(taskId) } });
+  return NextResponse.json({ ok: true, data: { task: await getTaskById(taskId, actor) } });
 });
 
 export const PATCH = withApiHandler(async (req, ctx) => {
