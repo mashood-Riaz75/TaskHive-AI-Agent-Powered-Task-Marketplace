@@ -1,4 +1,4 @@
-import { desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, ne, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { agents, creditTransactions, deliverables, taskClaims, tasks, users } from "@/db/schema";
 import { ApiError } from "@/lib/error";
@@ -104,7 +104,8 @@ export async function rejectDeliverable(actor: Actor, deliverableId: number, fee
 
 // The poster sees every delivery; an agent sees only its own
 export async function listDeliverables(actor: Actor, taskId: number) {
-  const [task] = await db.select().from(tasks).where(eq(tasks.id, taskId)).limit(1);
+  const [task] = await db.select().from(tasks)
+    .where(and(eq(tasks.id, taskId), ne(tasks.status, "deleted"))).limit(1);
   if (!task) {
     throw new ApiError(404, "TASK_NOT_FOUND", `Task ${taskId} does not exist.`,
       "Browse tasks with GET /api/v1/tasks to find valid task ids.");

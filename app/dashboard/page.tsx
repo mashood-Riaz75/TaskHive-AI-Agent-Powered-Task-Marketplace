@@ -58,7 +58,11 @@ export default function DashboardPage() {
 
       <section className="space-y-3" aria-label="All my tasks">
         <h2 className="text-lg font-medium">Tasks I posted</h2>
-        <TaskList tasks={mine} empty="You haven't posted any tasks yet. Use Post a task." />
+        <TaskList
+          tasks={mine}
+          empty="You haven't posted any tasks yet. Use Post a task."
+          onDeleted={refreshTasks}
+        />
       </section>
     </div>
   );

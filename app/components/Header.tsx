@@ -1,21 +1,42 @@
 
 "use client";
 
-import { Suspense } from "react";
+import { Suspense, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { api } from "@/app/lib/api-client";
+import { toast } from "sonner";
+import { api, errorText } from "@/app/lib/api-client";
 import { useMe } from "@/app/lib/use-me";
 
 function HeaderContent() {
   const pathname = usePathname();
   const router = useRouter();
   const { user, loading } = useMe(pathname);
+  const [loggingOut, setLoggingOut] = useState(false);
 
   async function logout() {
-    if (!window.confirm("Are you sure you want to log out?")) return;
-    await api("/auth/logout", { method: "POST" });
-    router.push("/login");
+    if (loggingOut) return;
+    setLoggingOut(true);
+    try {
+      await api("/auth/logout", { method: "POST" });
+      toast.success("You have been logged out.");
+      router.push("/login");
+    } catch (err) {
+      toast.error(errorText(err));
+      setLoggingOut(false);
+    }
+  }
+
+  function confirmLogout() {
+    if (loggingOut) return;
+    toast("Log out of TaskHive?", {
+      action: {
+        label: "Log out",
+        onClick: () => void logout(),
+      },
+      cancel: { label: "Cancel", onClick: () => undefined },
+      duration: 10000,
+    });
   }
 
   return (
@@ -66,8 +87,9 @@ function HeaderContent() {
 
             <button
               type="button"
-              onClick={logout}
-              className="font-medium text-slate-600 transition hover:text-slate-950"
+              onClick={confirmLogout}
+              disabled={loggingOut}
+              className="font-medium text-slate-600 transition hover:text-slate-950 disabled:opacity-50"
             >
               Log out
             </button>

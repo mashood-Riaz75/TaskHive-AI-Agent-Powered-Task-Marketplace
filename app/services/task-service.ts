@@ -1,4 +1,4 @@
-import { and, desc, eq, lt, type SQL } from "drizzle-orm";
+import { and, desc, eq, lt, ne, type SQL } from "drizzle-orm";
 import { db } from "@/db";
 import { categories, creditTransactions, deliverables, taskAttachments, taskClaims, tasks } from "@/db/schema";
 import { ApiError } from "@/lib/error";
@@ -58,7 +58,11 @@ export async function getTaskById(id: number, actor: Actor) {
   const ownerFilter = taskOwnerFilter(actor);
   const [row] = await db.select(taskSelect).from(tasks)
     .leftJoin(categories, eq(tasks.categoryId, categories.id))
-    .where(and(eq(tasks.id, id), ...(ownerFilter ? [ownerFilter] : []))).limit(1);
+    .where(and(
+      eq(tasks.id, id),
+      ne(tasks.status, "deleted"),
+      ...(ownerFilter ? [ownerFilter] : [])
+    )).limit(1);
 
   if (!row) {
     throw new ApiError(404, "TASK_NOT_FOUND", `Task ${id} does not exist.`,
@@ -95,6 +99,7 @@ export async function getTaskAttachment(taskId: number, attachmentId: number, ac
     .where(and(
       eq(taskAttachments.taskId, taskId),
       eq(taskAttachments.id, attachmentId),
+      ne(tasks.status, "deleted"),
       ...(ownerFilter ? [ownerFilter] : [])
     )).limit(1);
 
@@ -161,7 +166,7 @@ export async function createTask(actor: Actor, input: CreateTaskInput, files: Fi
   return getTaskById(taskId, actor);
 }
 
-async function lockEditableTask(tx: Tx, actor: Actor, taskId: number) {
+async function lockTaskForPoster(tx: Tx, actor: Actor, taskId: number) {
   const [task] = await tx.select().from(tasks).where(eq(tasks.id, taskId)).for("update");
   if (!task) {
     throw new ApiError(404, "TASK_NOT_FOUND", `Task ${taskId} does not exist.`);
@@ -173,8 +178,13 @@ async function lockEditableTask(tx: Tx, actor: Actor, taskId: number) {
   if (!isPoster) {
     throw new ApiError(403, "NOT_TASK_POSTER", "Only the task poster can edit or delete this task.");
   }
+  return task;
+}
+
+async function lockEditableTask(tx: Tx, actor: Actor, taskId: number) {
+  const task = await lockTaskForPoster(tx, actor, taskId);
   if (task.status !== "open") {
-    throw new ApiError(409, "TASK_NOT_EDITABLE", "Only open tasks can be edited or deleted.");
+    throw new ApiError(409, "TASK_NOT_EDITABLE", "Only open tasks can be edited.");
   }
   return task;
 }
@@ -216,7 +226,17 @@ export async function updateTask(actor: Actor, taskId: number, input: UpdateTask
 
 export async function deleteTask(actor: Actor, taskId: number) {
   await db.transaction(async (tx) => {
-    await lockEditableTask(tx, actor, taskId);
+    const task = await lockTaskForPoster(tx, actor, taskId);
+    if (task.status === "completed") {
+      await tx.update(tasks).set({ status: "deleted", updatedAt: new Date() })
+        .where(eq(tasks.id, taskId));
+      return;
+    }
+    if (task.status !== "open") {
+      throw new ApiError(409, "TASK_NOT_DELETABLE",
+        "Only open tasks without activity or completed tasks can be deleted.");
+    }
+
     const [claim] = await tx.select({ id: taskClaims.id }).from(taskClaims)
       .where(eq(taskClaims.taskId, taskId)).limit(1);
     const [deliverable] = await tx.select({ id: deliverables.id }).from(deliverables)
@@ -231,7 +251,7 @@ export async function deleteTask(actor: Actor, taskId: number) {
 }
 
 export async function listTasks(q: ListTasksQuery, actor: Actor) {
-  const conditions: SQL[] = [];
+  const conditions: SQL[] = [ne(tasks.status, "deleted")];
   if (q.status) conditions.push(eq(tasks.status, q.status));
   if (q.category) conditions.push(eq(categories.slug, q.category.toLowerCase()));
   const ownerFilter = taskOwnerFilter(actor, q.poster === "me");

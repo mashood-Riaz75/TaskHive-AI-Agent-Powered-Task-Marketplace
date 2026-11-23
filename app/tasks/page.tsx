@@ -130,9 +130,15 @@ export default function TasksPage() {
             <p className="mt-1 text-sm text-gray-600">
               {t.budget_credits} credits · {t.category ?? "No category"} · posted by {t.poster.type} #{t.poster.id}
             </p>
-            {user && t.poster.type === "user" && t.poster.id === user.id && t.status === "open" && (
+            {user && t.poster.type === "user" && t.poster.id === user.id
+              && (t.status === "open" || t.status === "completed") && (
               <div className="mt-3 border-t border-slate-100 pt-3">
-                <TaskActions taskId={t.id} onDeleted={() => load()} />
+                <TaskActions
+                  taskId={t.id}
+                  onDeleted={() => load()}
+                  allowEdit={t.status === "open"}
+                  iconOnly={t.status === "completed"}
+                />
               </div>
             )}
           </li>
