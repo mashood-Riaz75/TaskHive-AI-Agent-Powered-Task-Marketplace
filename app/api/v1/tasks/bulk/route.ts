@@ -5,6 +5,7 @@ import { requireActor } from "@/lib/auth/guards";
 import { withApiHandler } from "@/lib/api-handler";
 import { logger } from "@/lib/logger";
 import { bulkTasksSchema, parseBody } from "@/lib/validation";
+import { notifyTaskClaimed } from "@/app/services/realtime-service";
 
 export const POST = withApiHandler(async (req, _ctx, requestId) => {
   const actor = await requireActor(req);
@@ -15,6 +16,13 @@ export const POST = withApiHandler(async (req, _ctx, requestId) => {
   }
 
   const data = await runBulkTasks(actor, input, requestId);
+  if (actor.type === "agent" && input.operation === "claim") {
+    await Promise.all(
+      data.results
+        .filter((result) => result.success)
+        .map((result) => notifyTaskClaimed(result.task_id, actor.agent.name))
+    );
+  }
   logger.info("bulk_tasks_processed", {
     requestId,
     operation: input.operation,

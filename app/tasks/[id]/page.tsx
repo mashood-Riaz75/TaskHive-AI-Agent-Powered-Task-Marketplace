@@ -3,12 +3,13 @@
 
 import { Suspense } from "react";
 import Image from "next/image";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { api, ClientApiError, errorText } from "@/app/lib/api-client";
 import { useMe } from "@/app/lib/use-me";
 import type { Task } from "@/app/lib/types";
+import { TASK_STATUS_CHANGE_EVENT, type TaskStatusChange } from "@/app/lib/task-status-events";
 import StatusBadge from "@/app/components/StatusBadge";
 import DeliveriesPanel from "@/app/components/DeliveriesPanel";
 import TaskActions from "@/app/components/TaskActions";
@@ -34,11 +35,17 @@ function TaskDetailContent() {
 
   const [task, setTask] = useState<Task | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const taskRequest = useRef(0);
 
   const load = useCallback(async () => {
+    const requestId = ++taskRequest.current;
     try {
-      setTask(await fetchTask(id));
+      const currentTask = await fetchTask(id);
+      if (requestId !== taskRequest.current) return;
+      setTask(currentTask);
+      setError(null);
     } catch (err) {
+      if (requestId !== taskRequest.current) return;
       if (err instanceof ClientApiError && err.status === 401) {
         router.push("/login");
       } else {
@@ -48,24 +55,20 @@ function TaskDetailContent() {
   }, [id, router]);
 
   useEffect(() => {
-    let active = true;
-    fetchTask(id)
-      .then((task) => {
-        if (active) setTask(task);
-      })
-      .catch((err) => {
-        if (!active) return;
-        if (err instanceof ClientApiError && err.status === 401) {
-          router.push("/login");
-        } else {
-          setError(errorText(err));
-        }
-      });
-
+    void load();
     return () => {
-      active = false;
+      taskRequest.current += 1;
     };
-  }, [id, router]);
+  }, [load]);
+
+  useEffect(() => {
+    const handleTaskStatusChange = (event: Event) => {
+      const change = (event as CustomEvent<TaskStatusChange>).detail;
+      if (change?.taskId === Number(id)) void load();
+    };
+    window.addEventListener(TASK_STATUS_CHANGE_EVENT, handleTaskStatusChange);
+    return () => window.removeEventListener(TASK_STATUS_CHANGE_EVENT, handleTaskStatusChange);
+  }, [id, load]);
 
   if (error) {
     return (
