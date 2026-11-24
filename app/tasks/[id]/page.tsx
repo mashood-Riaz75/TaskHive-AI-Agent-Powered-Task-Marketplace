@@ -179,6 +179,9 @@ function TaskDetailContent() {
       </article>
 
       {isPoster && task.status === "open" && <TaskActions taskId={task.id} />}
+      {isPoster && task.status === "completed" && (
+        <TaskActions taskId={task.id} allowEdit={false} iconOnly />
+      )}
 
       {task.attachments && task.attachments.length > 0 && (
         <section className={`${cardClass} space-y-4`} aria-label="Task attachments">
