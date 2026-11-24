@@ -3,20 +3,42 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { api, errorText } from "@/app/lib/api-client";
+import {
+  emailFieldSchema,
+  getFieldError,
+  nameFieldSchema,
+  registrationPasswordFieldSchema,
+} from "@/lib/form-schemas";
+
+type RegisterField = "name" | "email" | "password";
+type RegisterFieldErrors = Partial<Record<RegisterField, string>>;
+
 export default function RegisterPage() {
   const router = useRouter();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<RegisterFieldErrors>({});
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setBusy(true);
     setError(null);
+    const errors = {
+      name: getFieldError(nameFieldSchema, name),
+      email: getFieldError(emailFieldSchema, email),
+      password: getFieldError(registrationPasswordFieldSchema, password),
+    };
+    setFieldErrors(errors);
+    if (Object.values(errors).some(Boolean)) return;
+
+    setBusy(true);
     try {
-      await api("/auth/register", { method: "POST", body: { name, email, password } });
+      await api("/auth/register", {
+        method: "POST",
+        body: { name: name.trim(), email: email.trim(), password },
+      });
       router.push("/login");
     } catch (err) {
       setError(errorText(err));
@@ -54,21 +76,48 @@ export default function RegisterPage() {
         <form onSubmit={onSubmit} noValidate className="space-y-5">
           <div>
             <label htmlFor="name" className="mb-2 block text-sm font-semibold text-slate-700">Name</label>
-            <input id="name" name="name" autoComplete="name" value={name}
-              onChange={(e) => setName(e.target.value)}
+            <input id="name" name="name" autoComplete="name" required maxLength={100} value={name}
+              aria-invalid={Boolean(fieldErrors.name)}
+              aria-describedby={fieldErrors.name ? "name-error" : undefined}
+              onBlur={() => setFieldErrors((current) => ({ ...current, name: getFieldError(nameFieldSchema, name) }))}
+              onChange={(e) => {
+                const value = e.target.value;
+                setName(value);
+                setError(null);
+                setFieldErrors((current) => ({ ...current, name: getFieldError(nameFieldSchema, value) }));
+              }}
               className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-amber-400 focus:bg-white focus:ring-4 focus:ring-amber-100" />
+            {fieldErrors.name && <p id="name-error" className="mt-2 text-sm text-red-600">{fieldErrors.name}</p>}
           </div>
           <div>
             <label htmlFor="email" className="mb-2 block text-sm font-semibold text-slate-700">Email</label>
-            <input id="email" name="email" type="email" autoComplete="email" value={email}
-              onChange={(e) => setEmail(e.target.value)}
+            <input id="email" name="email" type="email" autoComplete="email" required value={email}
+              aria-invalid={Boolean(fieldErrors.email)}
+              aria-describedby={fieldErrors.email ? "email-error" : undefined}
+              onBlur={() => setFieldErrors((current) => ({ ...current, email: getFieldError(emailFieldSchema, email) }))}
+              onChange={(e) => {
+                const value = e.target.value;
+                setEmail(value);
+                setError(null);
+                setFieldErrors((current) => ({ ...current, email: getFieldError(emailFieldSchema, value) }));
+              }}
               className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-amber-400 focus:bg-white focus:ring-4 focus:ring-amber-100" />
+            {fieldErrors.email && <p id="email-error" className="mt-2 text-sm text-red-600">{fieldErrors.email}</p>}
           </div>
           <div>
             <label htmlFor="password" className="mb-2 block text-sm font-semibold text-slate-700">Password <span className="font-normal text-slate-400">(8+ characters)</span></label>
-            <input id="password" name="password" type="password" autoComplete="new-password" value={password}
-              onChange={(e) => setPassword(e.target.value)}
+            <input id="password" name="password" type="password" autoComplete="new-password" required minLength={8} value={password}
+              aria-invalid={Boolean(fieldErrors.password)}
+              aria-describedby={fieldErrors.password ? "password-error" : undefined}
+              onBlur={() => setFieldErrors((current) => ({ ...current, password: getFieldError(registrationPasswordFieldSchema, password) }))}
+              onChange={(e) => {
+                const value = e.target.value;
+                setPassword(value);
+                setError(null);
+                setFieldErrors((current) => ({ ...current, password: getFieldError(registrationPasswordFieldSchema, value) }));
+              }}
               className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-amber-400 focus:bg-white focus:ring-4 focus:ring-amber-100" />
+            {fieldErrors.password && <p id="password-error" className="mt-2 text-sm text-red-600">{fieldErrors.password}</p>}
           </div>
           {error && <p role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>}
           <button type="submit" disabled={busy}

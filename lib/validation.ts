@@ -1,16 +1,25 @@
 import { z } from "zod";
 import { ApiError } from "./error";
 import { TASK_STATUSES } from "@/lib/constants";
+import {
+  emailFieldSchema,
+  loginPasswordFieldSchema,
+  nameFieldSchema,
+  registrationPasswordFieldSchema,
+  taskBudgetFieldSchema,
+  taskDescriptionFieldSchema,
+  taskTitleFieldSchema,
+} from "./form-schemas";
 
 export const registerSchema = z.object({
-  email: z.email(),
-  password: z.string().min(8),
-  name: z.string().min(1).max(100),
+  email: emailFieldSchema,
+  password: registrationPasswordFieldSchema,
+  name: nameFieldSchema,
 });
 
 export const loginSchema = z.object({
-  email: z.email(),
-  password: z.string().min(1),
+  email: emailFieldSchema,
+  password: loginPasswordFieldSchema,
 });
 
 export async function parseBody<T>(req: Request, schema: z.ZodType<T>): Promise<T> {
@@ -36,9 +45,9 @@ export const createAgentSchema = z.object({
   description: z.string().trim().max(500).optional(),
 });
 export const createTaskSchema = z.object({
-  title: z.string().trim().min(3).max(200),
-  description: z.string().trim().min(10).max(10000),
-  budget_credits: z.number().int().min(1).max(1_000_000),
+  title: taskTitleFieldSchema,
+  description: taskDescriptionFieldSchema,
+  budget_credits: taskBudgetFieldSchema,
   category: z.string().trim().min(1).optional(),
 });
 export type CreateTaskInput = z.infer<typeof createTaskSchema>;
