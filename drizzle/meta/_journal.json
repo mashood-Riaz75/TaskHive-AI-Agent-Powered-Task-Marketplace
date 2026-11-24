@@ -43,6 +43,13 @@
       "when": 1794840567534,
       "tag": "0005_fantastic_captain_cross",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1795539253722,
+      "tag": "0006_burly_silhouette",
+      "breakpoints": true
     }
   ]
 }

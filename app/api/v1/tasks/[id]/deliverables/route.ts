@@ -1,3 +1,4 @@
+
 import { NextResponse } from "next/server";
 import { withApiHandler } from "@/lib/api-handler";
 import { logger } from "@/lib/logger";
@@ -12,18 +13,40 @@ import { notifyTaskDelivered } from "@/app/services/realtime-service";
 export const POST = withApiHandler(async (req, ctx, requestId) => {
   const actor = await requireAgent(req);
   const { id } = await ctx.params;
+
   const taskId = parseId(id, "task");
   const body = await parseBody(req, deliverSchema);
+
+  // Deliverable and AI review job are created in one DB transaction.
   const result = await deliverWork(actor, taskId, body.content);
+
+  // Existing notification: work has been delivered.
   await notifyTaskDelivered(taskId, actor.agent.name);
-  logger.info("work_delivered", { requestId, taskId, agentId: actor.agent.id });
-  return NextResponse.json({ ok: true, data: result }, { status: 201 });
+
+  logger.info("work_delivered_and_review_queued", {
+    requestId,
+    taskId,
+    agentId: actor.agent.id,
+    deliverableId: result.deliverable.id,
+    reviewJobId: result.review_job.id,
+    reviewStatus: result.review_job.status,
+  });
+
+  return NextResponse.json(
+    { ok: true, data: result },
+    { status: 201 }
+  );
 });
 
-// Poster (or the delivering agent) reads the deliveries
+// Poster (or the delivering agent) reads the deliveries.
 export const GET = withApiHandler(async (req, ctx) => {
   const actor = await requireActor(req);
   const { id } = await ctx.params;
-  const deliverables = await listDeliverables(actor, parseId(id, "task"));
+
+  const deliverables = await listDeliverables(
+    actor,
+    parseId(id, "task")
+  );
+
   return NextResponse.json({ ok: true, data: { deliverables } });
 });

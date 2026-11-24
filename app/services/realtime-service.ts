@@ -1,7 +1,9 @@
+
 import Pusher from "pusher";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { agents, tasks } from "@/db/schema";
+import type { ReviewResult } from "@/db/schema";
 import { logger } from "@/lib/logger";
 
 function createPusherServer() {
@@ -19,13 +21,19 @@ function createPusherServer() {
 
 type TaskPosterEvent = "task.claimed" | "task.delivered";
 
-async function notifyTaskPoster(taskId: number, agentName: string, event: TaskPosterEvent) {
+async function notifyTaskPoster(
+  taskId: number,
+  agentName: string,
+  event: TaskPosterEvent
+) {
   try {
-    const [task] = await db.select({
-      title: tasks.title,
-      posterUserId: tasks.posterUserId,
-      posterOperatorId: agents.operatorId,
-    }).from(tasks)
+    const [task] = await db
+      .select({
+        title: tasks.title,
+        posterUserId: tasks.posterUserId,
+        posterOperatorId: agents.operatorId,
+      })
+      .from(tasks)
       .leftJoin(agents, eq(tasks.posterAgentId, agents.id))
       .where(eq(tasks.id, taskId))
       .limit(1);
@@ -36,6 +44,7 @@ async function notifyTaskPoster(taskId: number, agentName: string, event: TaskPo
     }
 
     const posterUserId = task.posterUserId ?? task.posterOperatorId;
+
     if (!posterUserId) {
       logger.warn("realtime_poster_not_found", { taskId, event });
       return;
@@ -44,9 +53,18 @@ async function notifyTaskPoster(taskId: number, agentName: string, event: TaskPo
     await createPusherServer().trigger(
       `private-user-${posterUserId}`,
       event,
-      { task_id: taskId, task_title: task.title, agent_name: agentName }
+      {
+        task_id: taskId,
+        task_title: task.title,
+        agent_name: agentName,
+      }
     );
-    logger.info("realtime_event_sent", { taskId, userId: posterUserId, event });
+
+    logger.info("realtime_event_sent", {
+      taskId,
+      userId: posterUserId,
+      event,
+    });
   } catch (error) {
     logger.warn("realtime_publish_failed", {
       taskId,
@@ -56,15 +74,91 @@ async function notifyTaskPoster(taskId: number, agentName: string, event: TaskPo
   }
 }
 
-export async function notifyTaskClaimed(taskId: number, agentName: string) {
+export async function notifyTaskClaimed(
+  taskId: number,
+  agentName: string
+) {
   await notifyTaskPoster(taskId, agentName, "task.claimed");
 }
 
-export async function notifyTaskDelivered(taskId: number, agentName: string) {
+export async function notifyTaskDelivered(
+  taskId: number,
+  agentName: string
+) {
   await notifyTaskPoster(taskId, agentName, "task.delivered");
 }
 
-export function authorizeUserChannel(socketId: string, channelName: string) {
+// Separate notification when the AI review is ready.
+export async function notifyTaskAIReviewCompleted(
+  taskId: number,
+  deliverableId: number,
+  agentName: string,
+  review: ReviewResult
+) {
+  try {
+    const [task] = await db
+      .select({
+        title: tasks.title,
+        posterUserId: tasks.posterUserId,
+        posterOperatorId: agents.operatorId,
+      })
+      .from(tasks)
+      .leftJoin(agents, eq(tasks.posterAgentId, agents.id))
+      .where(eq(tasks.id, taskId))
+      .limit(1);
+
+    if (!task) {
+      logger.warn("ai_review_notification_task_not_found", {
+        taskId,
+        deliverableId,
+      });
+      return;
+    }
+
+    const posterUserId = task.posterUserId ?? task.posterOperatorId;
+
+    if (!posterUserId) {
+      logger.warn("ai_review_notification_poster_not_found", {
+        taskId,
+        deliverableId,
+      });
+      return;
+    }
+
+    await createPusherServer().trigger(
+      `private-user-${posterUserId}`,
+      "task.ai_review_completed",
+      {
+        task_id: taskId,
+        deliverable_id: deliverableId,
+        task_title: task.title,
+        agent_name: agentName,
+        review: {
+          overall_score: review.overall_score,
+          recommendation: review.recommendation,
+          summary: review.summary,
+        },
+      }
+    );
+
+    logger.info("ai_review_notification_sent", {
+      taskId,
+      deliverableId,
+      userId: posterUserId,
+    });
+  } catch (error) {
+    logger.warn("ai_review_notification_failed", {
+      taskId,
+      deliverableId,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
+
+export function authorizeUserChannel(
+  socketId: string,
+  channelName: string
+) {
   try {
     return createPusherServer().authorizeChannel(socketId, channelName);
   } catch (error) {
