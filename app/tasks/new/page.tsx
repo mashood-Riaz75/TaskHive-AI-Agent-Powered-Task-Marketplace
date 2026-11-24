@@ -14,6 +14,15 @@ import {
 import { useRequireUser } from "@/app/lib/use-me";
 import type { Category, Task } from "@/app/lib/types";
 import { buttonClass, inputClass } from "@/app/components/ui";
+import {
+  getFieldError,
+  taskBudgetFieldSchema,
+  taskDescriptionFieldSchema,
+  taskTitleFieldSchema,
+} from "@/lib/form-schemas";
+
+type TaskField = "title" | "description" | "budget";
+type TaskFieldErrors = Partial<Record<TaskField, string>>;
 
 export default function NewTaskPage() {
   useRequireUser();
@@ -23,6 +32,7 @@ export default function NewTaskPage() {
   const [budget, setBudget] = useState("");
   const [category, setCategory] = useState("");
   const [files, setFiles] = useState<File[]>([]);
+  const [fieldErrors, setFieldErrors] = useState<TaskFieldErrors>({});
   const [categories, setCategories] = useState<Category[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [categoryError, setCategoryError] = useState<string | null>(null);
@@ -40,8 +50,18 @@ export default function NewTaskPage() {
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setBusy(true);
     setError(null);
+    const errors = {
+      title: getFieldError(taskTitleFieldSchema, title),
+      description: getFieldError(taskDescriptionFieldSchema, description),
+      budget: budget.trim()
+        ? getFieldError(taskBudgetFieldSchema, Number(budget))
+        : "Budget is required.",
+    };
+    setFieldErrors(errors);
+    if (Object.values(errors).some(Boolean)) return;
+
+    setBusy(true);
     try {
       let body:
         | FormData
@@ -69,7 +89,7 @@ export default function NewTaskPage() {
       }
 
       const { data } = await api<{ task: Task }>("/tasks", { method: "POST", body });
-      toast.success("Task posted successfully.");
+      toast.success("Task posted and is live in the marketplace.");
       router.push(`/tasks/${data.task.id}`);
     } catch (err) {
       const message = errorText(err);
@@ -91,21 +111,58 @@ export default function NewTaskPage() {
       <form onSubmit={onSubmit} noValidate className="space-y-5 rounded-3xl border border-slate-200/80 bg-white p-5 shadow-sm shadow-slate-900/[0.04] sm:p-8">
         <div>
           <label htmlFor="title" className="mb-2 block text-sm font-semibold text-slate-700">Task title</label>
-          <input id="title" name="title" value={title}
-            onChange={(e) => setTitle(e.target.value)} className={inputClass} />
+          <input id="title" name="title" required minLength={3} maxLength={200} value={title}
+            aria-invalid={Boolean(fieldErrors.title)}
+            aria-describedby={fieldErrors.title ? "title-error" : undefined}
+            onBlur={() => setFieldErrors((current) => ({ ...current, title: getFieldError(taskTitleFieldSchema, title) }))}
+            onChange={(e) => {
+              const value = e.target.value;
+              setTitle(value);
+              setError(null);
+              setFieldErrors((current) => ({ ...current, title: getFieldError(taskTitleFieldSchema, value) }));
+            }} className={inputClass} />
+          {fieldErrors.title && <p id="title-error" className="mt-2 text-sm text-red-600">{fieldErrors.title}</p>}
         </div>
         <div>
           <label htmlFor="description" className="mb-2 block text-sm font-semibold text-slate-700">
             Description <span className="font-normal text-slate-400">(what you want and what a good result looks like)</span>
           </label>
-          <textarea id="description" name="description" rows={6} value={description}
-            onChange={(e) => setDescription(e.target.value)} className={`${inputClass} resize-y`} />
+          <textarea id="description" name="description" rows={6} required minLength={10} maxLength={10000} value={description}
+            aria-invalid={Boolean(fieldErrors.description)}
+            aria-describedby={fieldErrors.description ? "description-error" : undefined}
+            onBlur={() => setFieldErrors((current) => ({ ...current, description: getFieldError(taskDescriptionFieldSchema, description) }))}
+            onChange={(e) => {
+              const value = e.target.value;
+              setDescription(value);
+              setError(null);
+              setFieldErrors((current) => ({ ...current, description: getFieldError(taskDescriptionFieldSchema, value) }));
+            }} className={`${inputClass} resize-y`} />
+          {fieldErrors.description && <p id="description-error" className="mt-2 text-sm text-red-600">{fieldErrors.description}</p>}
         </div>
         <div className="grid gap-5 sm:grid-cols-2">
           <div>
             <label htmlFor="budget" className="mb-2 block text-sm font-semibold text-slate-700">Budget <span className="font-normal text-slate-400">(credits)</span></label>
-            <input id="budget" name="budget_credits" type="number" value={budget}
-              onChange={(e) => setBudget(e.target.value)} className={inputClass} />
+            <input id="budget" name="budget_credits" type="number" required min={1} max={1_000_000} step={1} value={budget}
+              aria-invalid={Boolean(fieldErrors.budget)}
+              aria-describedby={fieldErrors.budget ? "budget-error" : undefined}
+              onBlur={() => setFieldErrors((current) => ({
+                ...current,
+                budget: budget.trim()
+                  ? getFieldError(taskBudgetFieldSchema, Number(budget))
+                  : "Budget is required.",
+              }))}
+              onChange={(e) => {
+                const value = e.target.value;
+                setBudget(value);
+                setError(null);
+                setFieldErrors((current) => ({
+                  ...current,
+                  budget: value.trim()
+                    ? getFieldError(taskBudgetFieldSchema, Number(value))
+                    : "Budget is required.",
+                }));
+              }} className={inputClass} />
+            {fieldErrors.budget && <p id="budget-error" className="mt-2 text-sm text-red-600">{fieldErrors.budget}</p>}
           </div>
           <div>
             <label htmlFor="category" className="mb-2 block text-sm font-semibold text-slate-700">Category</label>
@@ -155,7 +212,7 @@ export default function NewTaskPage() {
             className={`${inputClass} file:mr-3 file:rounded-full file:border-0 file:bg-amber-100 file:px-3 file:py-1 file:text-sm file:font-semibold`}
           />
           <p className="mt-2 text-xs leading-5 text-slate-500">
-            Available for Code review and Data extraction. Choose up to {MAX_TASK_ATTACHMENTS} JPEG, PNG, GIF, WebP, MP4, or WebM files ({MAX_TASK_ATTACHMENT_BYTES / (1024 * 1024)} MB total).
+            Attachments are only available for Data extraction tasks. Select one of these categories to enable uploads. Choose up to {MAX_TASK_ATTACHMENTS} JPEG, PNG, GIF, WebP, MP4, or WebM files ({MAX_TASK_ATTACHMENT_BYTES / (1024 * 1024)} MB total).
           </p>
           {files.length > 0 && (
             <ul className="mt-2 list-inside list-disc text-sm text-slate-600">

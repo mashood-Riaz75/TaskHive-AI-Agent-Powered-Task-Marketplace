@@ -16,7 +16,7 @@ import TaskActions from "@/app/components/TaskActions";
 import { cardClass, linkClass } from "@/app/components/ui";
 
 const statusHint: Record<string, string> = {
-  open: "Waiting for an agent to claim this task.",
+  open: "This task is open and available for an agent to claim.",
   claimed: "An agent has claimed this task and is working on it.",
   delivered: "Work was delivered and is waiting for the poster's review.",
   completed: "This task is completed.",
@@ -178,6 +178,19 @@ function TaskDetailContent() {
         </dl>
       </article>
 
+      {isPoster && task.status === "open" && (
+        <section
+          role="status"
+          aria-live="polite"
+          className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5"
+        >
+          <h2 className="font-bold text-emerald-950">Your task is live</h2>
+          <p className="mt-2 text-sm leading-6 text-emerald-900">
+            It is available to agents and waiting to be claimed, just wait for few mins your task will be claimed.
+          </p>
+        </section>
+      )}
+
       {isPoster && task.status === "open" && <TaskActions taskId={task.id} />}
       {isPoster && task.status === "completed" && (
         <TaskActions taskId={task.id} allowEdit={false} iconOnly />
@@ -226,30 +239,6 @@ function TaskDetailContent() {
       {isPoster && (
         <DeliveriesPanel task={task} onChanged={load} />
       )}
-
-      <section
-        className={`${cardClass} bg-slate-50`}
-        aria-label="For agents"
-      >
-        <h2 className="font-bold text-slate-950">
-          For agents
-        </h2>
-
-        <p className="mt-2 text-sm leading-6 text-slate-600">
-          Claim this task with{" "}
-          <code className="break-all rounded bg-white px-1.5 py-1 font-mono text-xs text-slate-800">
-            POST /api/v1/tasks/{task.id}/claims
-          </code>
-          , then submit your work with{" "}
-          <code className="break-all rounded bg-white px-1.5 py-1 font-mono text-xs text-slate-800">
-            POST /api/v1/tasks/{task.id}/deliverables
-          </code>
-          . Send your key as{" "}
-          <code className="break-all rounded bg-white px-1.5 py-1 font-mono text-xs text-slate-800">
-            Authorization: Bearer th_agent_...
-          </code>
-        </p>
-      </section>
     </div>
   );
 }

@@ -3,19 +3,39 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { api, errorText } from "@/app/lib/api-client";
+import {
+  emailFieldSchema,
+  getFieldError,
+  loginPasswordFieldSchema,
+} from "@/lib/form-schemas";
+
+type LoginField = "email" | "password";
+type LoginFieldErrors = Partial<Record<LoginField, string>>;
+
 export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<LoginFieldErrors>({});
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setBusy(true);
     setError(null);
+    const errors = {
+      email: getFieldError(emailFieldSchema, email),
+      password: getFieldError(loginPasswordFieldSchema, password),
+    };
+    setFieldErrors(errors);
+    if (Object.values(errors).some(Boolean)) return;
+
+    setBusy(true);
     try {
-      await api("/auth/login", { method: "POST", body: { email, password } });
+      await api("/auth/login", {
+        method: "POST",
+        body: { email: email.trim(), password },
+      });
       router.push("/tasks");
     } catch (err) {
       setError(errorText(err));
@@ -48,15 +68,33 @@ export default function LoginPage() {
         <form onSubmit={onSubmit} noValidate className="space-y-5">
           <div>
             <label htmlFor="email" className="mb-2 block text-sm font-semibold text-slate-700">Email</label>
-            <input id="email" name="email" type="email" autoComplete="email" value={email}
-              onChange={(e) => setEmail(e.target.value)}
+            <input id="email" name="email" type="email" autoComplete="email" required value={email}
+              aria-invalid={Boolean(fieldErrors.email)}
+              aria-describedby={fieldErrors.email ? "email-error" : undefined}
+              onBlur={() => setFieldErrors((current) => ({ ...current, email: getFieldError(emailFieldSchema, email) }))}
+              onChange={(e) => {
+                const value = e.target.value;
+                setEmail(value);
+                setError(null);
+                setFieldErrors((current) => ({ ...current, email: getFieldError(emailFieldSchema, value) }));
+              }}
               className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-amber-400 focus:bg-white focus:ring-4 focus:ring-amber-100" />
+            {fieldErrors.email && <p id="email-error" className="mt-2 text-sm text-red-600">{fieldErrors.email}</p>}
           </div>
           <div>
             <label htmlFor="password" className="mb-2 block text-sm font-semibold text-slate-700">Password</label>
-            <input id="password" name="password" type="password" autoComplete="current-password" value={password}
-              onChange={(e) => setPassword(e.target.value)}
+            <input id="password" name="password" type="password" autoComplete="current-password" required value={password}
+              aria-invalid={Boolean(fieldErrors.password)}
+              aria-describedby={fieldErrors.password ? "password-error" : undefined}
+              onBlur={() => setFieldErrors((current) => ({ ...current, password: getFieldError(loginPasswordFieldSchema, password) }))}
+              onChange={(e) => {
+                const value = e.target.value;
+                setPassword(value);
+                setError(null);
+                setFieldErrors((current) => ({ ...current, password: getFieldError(loginPasswordFieldSchema, value) }));
+              }}
               className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-amber-400 focus:bg-white focus:ring-4 focus:ring-amber-100" />
+            {fieldErrors.password && <p id="password-error" className="mt-2 text-sm text-red-600">{fieldErrors.password}</p>}
           </div>
           {error && <p role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>}
           <button type="submit" disabled={busy}
