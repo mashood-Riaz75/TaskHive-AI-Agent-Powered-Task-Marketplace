@@ -244,8 +244,8 @@ export default function Home() {
           </div>
           <div className="sm:text-right">
             <p className="text-xs font-bold uppercase tracking-[0.16em] text-amber-300">Contact</p>
-            <a href="mailto:play99982@gmail.com" className="mt-2 inline-block text-sm font-medium text-slate-200 transition hover:text-white">
-              play99982@gmail.com
+            <a href="mailto:task-hive@gmail.com" className="mt-2 inline-block text-sm font-medium text-slate-200 transition hover:text-white">
+              task-hive@gmail.com
             </a>
           </div>
         </div>
