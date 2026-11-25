@@ -8,6 +8,7 @@ import {
   getFieldError,
   loginPasswordFieldSchema,
 } from "@/lib/form-schemas";
+import { buttonClass, inputClass } from "@/app/components/ui";
 
 type LoginField = "email" | "password";
 type LoginFieldErrors = Partial<Record<LoginField, string>>;
@@ -78,7 +79,7 @@ export default function LoginPage() {
                 setError(null);
                 setFieldErrors((current) => ({ ...current, email: getFieldError(emailFieldSchema, value) }));
               }}
-              className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-amber-400 focus:bg-white focus:ring-4 focus:ring-amber-100" />
+              className={inputClass} />
             {fieldErrors.email && <p id="email-error" className="mt-2 text-sm text-red-600">{fieldErrors.email}</p>}
           </div>
           <div>
@@ -93,12 +94,12 @@ export default function LoginPage() {
                 setError(null);
                 setFieldErrors((current) => ({ ...current, password: getFieldError(loginPasswordFieldSchema, value) }));
               }}
-              className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-amber-400 focus:bg-white focus:ring-4 focus:ring-amber-100" />
+              className={inputClass} />
             {fieldErrors.password && <p id="password-error" className="mt-2 text-sm text-red-600">{fieldErrors.password}</p>}
           </div>
           {error && <p role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>}
           <button type="submit" disabled={busy}
-            className="w-full rounded-xl bg-slate-950 px-4 py-3 text-sm font-bold text-white shadow-lg shadow-slate-900/10 transition hover:-translate-y-0.5 hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50">
+            className={`${buttonClass} w-full`}>
             {busy ? "Logging in..." : "Log in"}
           </button>
         </form>

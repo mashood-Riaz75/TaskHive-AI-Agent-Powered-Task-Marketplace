@@ -68,15 +68,15 @@ function EditTaskContent() {
     }
   }
 
-  if (userLoading || (!task && !error)) return <p role="status">Loading task...</p>;
-  if (error) return <p role="alert" className="text-sm text-red-600">{error}</p>;
+  if (userLoading || (!task && !error)) return <p role="status" className="animate-pulse text-sm text-slate-500">Loading task...</p>;
+  if (error) return <p role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>;
   if (!task || !user || task.poster.type !== "user" || task.poster.id !== user.id) {
-    return <p role="alert" className="text-sm text-red-600">Only the task poster can edit this task.</p>;
+    return <p role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">Only the task poster can edit this task.</p>;
   }
   if (task.status !== "open") {
     return (
-      <div className="space-y-3">
-        <p role="alert" className="text-sm text-slate-600">Only open tasks can be edited.</p>
+      <div className="space-y-4 rounded-2xl border border-amber-200 bg-amber-50 p-5">
+        <p role="alert" className="text-sm leading-6 text-amber-950">Only open tasks can be edited.</p>
         <Link href={`/tasks/${id}`} className={linkClass}>Back to task</Link>
       </div>
     );
@@ -86,10 +86,11 @@ function EditTaskContent() {
     <div className="mx-auto w-full max-w-3xl space-y-6">
       <Link href={`/tasks/${id}`} className={linkClass}>Back to task</Link>
       <header>
-        <h1 className="text-3xl font-bold tracking-tight text-slate-950">Edit task</h1>
-        <p className="mt-2 text-sm text-slate-500">Only open tasks can be edited.</p>
+        <p className="text-xs font-bold uppercase tracking-[0.18em] text-amber-700">Task settings</p>
+        <h1 className="mt-2 text-3xl font-bold tracking-tight text-slate-950">Edit task</h1>
+        <p className="mt-2 text-sm text-slate-600">Update the brief and budget while the task is still open.</p>
       </header>
-      <form onSubmit={onSubmit} noValidate className="space-y-5 rounded-3xl border border-slate-200/80 bg-white p-5 shadow-sm sm:p-8">
+      <form onSubmit={onSubmit} noValidate className="space-y-5 rounded-3xl border border-slate-200 bg-white p-5 shadow-lg shadow-slate-900/[0.04] sm:p-8">
         <div>
           <label htmlFor="title" className="mb-2 block text-sm font-semibold text-slate-700">Task title</label>
           <input id="title" value={title} onChange={(e) => setTitle(e.target.value)} className={inputClass} />
@@ -119,7 +120,7 @@ function EditTaskContent() {
             )}
           </div>
         </div>
-        {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
+        {error && <p role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>}
         <button type="submit" disabled={busy} className={buttonClass}>
           {busy ? "Saving..." : "Save changes"}
         </button>
