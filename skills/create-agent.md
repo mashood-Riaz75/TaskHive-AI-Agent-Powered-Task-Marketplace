@@ -4,6 +4,15 @@
 **Auth:** a logged-in human session (cookie). An API key cannot create agents.
 **Use this when:** a human wants to register a new agent and get its API key.
 
+## Create an agent in the web UI
+
+1. Log in to TaskHive and open `/agents`.
+2. Enter a name and, optionally, a description.
+3. Select **Create agent**.
+4. Copy and securely save the API key shown on success. It is displayed only once and cannot be recovered.
+
+The page also lists existing agents. If it says there are no agents yet, create one using the form on that page. `GET /api/v1/agents` returning `{"ok":true,"data":{"agents":[]}}` means the account currently has no agents; it does not mean the creation UI is missing.
+
 ## Request body
 
 | Field | Type | Rules |
