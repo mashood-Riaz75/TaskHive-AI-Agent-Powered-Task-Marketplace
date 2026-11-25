@@ -77,15 +77,21 @@ export default function TasksPage() {
   }, [router]);
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Tasks</h1>
-        <Link href="/tasks/new" className={linkClass}>Post a task</Link>
-      </div>
-
-      <div className="flex gap-3">
+    <div className="mx-auto w-full max-w-6xl space-y-6">
+      <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <label htmlFor="status" className="mb-1 block text-sm">Status</label>
+          <p className="text-xs font-bold uppercase tracking-[0.18em] text-amber-700">Marketplace</p>
+          <h1 className="mt-2 text-3xl font-bold tracking-tight text-slate-950 sm:text-4xl">Browse tasks</h1>
+          <p className="mt-2 text-sm leading-6 text-slate-600">Find work that matches your skills or post a new request for agents.</p>
+        </div>
+        <Link href="/tasks/new" className="inline-flex min-h-11 items-center justify-center rounded-xl bg-slate-950 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-amber-200">
+          Post a task
+        </Link>
+      </header>
+
+      <section aria-label="Filter tasks" className="grid gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-900/[0.03] sm:grid-cols-2 sm:p-5">
+        <div>
+          <label htmlFor="status" className="mb-2 block text-sm font-semibold text-slate-700">Status</label>
           <select id="status" value={status} onChange={(e) => {
             setLoading(true);
             setError(null);
@@ -99,7 +105,7 @@ export default function TasksPage() {
           </select>
         </div>
         <div>
-          <label htmlFor="category" className="mb-1 block text-sm">Category</label>
+          <label htmlFor="category" className="mb-2 block text-sm font-semibold text-slate-700">Category</label>
           <select id="category" value={category} onChange={(e) => {
             setLoading(true);
             setError(null);
@@ -111,28 +117,42 @@ export default function TasksPage() {
             ))}
           </select>
         </div>
-      </div>
+      </section>
 
-      {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
+      {error && <p role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>}
       {categoryError && (
-        <p role="alert" className="text-sm text-red-600">
+        <p role="alert" className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
           Could not load categories: {categoryError}
         </p>
       )}
+
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-3">
+        <p className="text-sm font-semibold text-slate-800">Task listings</p>
+        <p aria-live="polite" className="text-xs font-medium text-slate-500">
+          {loading ? "Updating results..." : `${tasks.length} shown`}
+        </p>
+      </div>
 
       <ul className="space-y-3">
         {tasks.map((t) => (
           <li key={t.id} className={cardClass}>
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <Link href={`/tasks/${t.id}`} className="font-medium underline">{t.title}</Link>
+              <Link
+                href={`/tasks/${t.id}`}
+                className="min-w-0 text-base font-semibold leading-6 text-slate-950 underline decoration-slate-300 underline-offset-4 transition hover:decoration-amber-500 focus-visible:rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300"
+              >
+                {t.title}
+              </Link>
               <StatusBadge status={t.status} />
             </div>
-            <p className="mt-1 text-sm text-gray-600">
-              {t.budget_credits} credits · {t.category ?? "No category"} · posted by {t.poster.type} #{t.poster.id}
-            </p>
+            <div className="mt-3 flex flex-wrap items-center gap-2 text-xs font-medium text-slate-600">
+              <span className="rounded-full bg-amber-50 px-3 py-1.5 text-amber-900">{t.budget_credits} credits</span>
+              <span className="rounded-full bg-slate-100 px-3 py-1.5">{t.category ?? "No category"}</span>
+              <span className="text-slate-500">Posted by {t.poster.type} #{t.poster.id}</span>
+            </div>
             {user && t.poster.type === "user" && t.poster.id === user.id
               && (t.status === "open" || t.status === "completed") && (
-              <div className="mt-3 border-t border-slate-100 pt-3">
+              <div className="mt-4 border-t border-slate-100 pt-3">
                 <TaskActions
                   taskId={t.id}
                   onDeleted={() => load()}
@@ -145,13 +165,22 @@ export default function TasksPage() {
         ))}
       </ul>
 
-      {!loading && !error && tasks.length === 0 && <p className="text-sm">No tasks match these filters.</p>}
-      {loading && <p className="text-sm">Loading...</p>}
+      {!loading && !error && tasks.length === 0 && (
+        <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-5 py-10 text-center">
+          <h2 className="font-semibold text-slate-900">No tasks match these filters</h2>
+          <p className="mt-1 text-sm text-slate-500">Try another status or category to see more work.</p>
+        </div>
+      )}
+      {loading && tasks.length === 0 && (
+        <p role="status" className="animate-pulse text-sm text-slate-500">Loading tasks...</p>
+      )}
 
       {meta?.has_more && meta.next_cursor && (
-        <button type="button" disabled={loading} onClick={() => load(meta.next_cursor!)} className={buttonClass}>
-          Load more
-        </button>
+        <div className="flex justify-center pt-2">
+          <button type="button" disabled={loading} onClick={() => load(meta.next_cursor!)} className={buttonClass}>
+            {loading ? "Loading..." : "Load more tasks"}
+          </button>
+        </div>
       )}
     </div>
   );

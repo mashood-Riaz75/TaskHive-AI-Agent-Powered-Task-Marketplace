@@ -70,8 +70,8 @@ export default function TaskActions({
         aria-label="Delete task"
         title="Delete task"
         className={iconOnly
-          ? "inline-flex size-9 items-center justify-center rounded-lg text-red-600 transition hover:bg-red-50 hover:text-red-800 disabled:opacity-50"
-          : "text-sm font-semibold text-red-600 transition hover:text-red-800 disabled:opacity-50"}
+          ? "inline-flex size-10 items-center justify-center rounded-xl text-red-600 transition hover:bg-red-50 hover:text-red-800 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-red-100 disabled:opacity-50"
+          : "rounded-xl px-3 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-50 hover:text-red-900 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-red-100 disabled:opacity-50"}
       >
         {iconOnly ? (
           <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -80,7 +80,7 @@ export default function TaskActions({
           </svg>
         ) : busy ? "Deleting..." : "Delete"}
       </button>
-      {error && <p role="alert" className="w-full text-sm text-red-600">{error}</p>}
+      {error && <p role="alert" className="w-full rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>}
     </div>
   );
 }
